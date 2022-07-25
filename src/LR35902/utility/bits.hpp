@@ -31,7 +31,6 @@ template<> struct bytes_to_uint<7U> { using value = uint64_t; };
 template<> struct bytes_to_uint<8U> { using value = uint64_t; };
 template<size_t V> using bytes_to_uint_t = typename bytes_to_uint<V>::value;
 
-
 constexpr auto byteswap(std::unsigned_integral auto v) noexcept ->decltype(v)
 {
     uint8_t * result = reinterpret_cast<uint8_t *>(&v);
@@ -44,7 +43,6 @@ bool is_native_endian(std::endian v)
 {
     return std::endian::native == v;
 }
-
 
 constexpr auto to_little_endian(std::unsigned_integral auto v) -> decltype(v)
 {
