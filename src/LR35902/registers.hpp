@@ -47,20 +47,54 @@ struct Register
     uint16_t BC = 0;
     uint16_t DE = 0;
     uint16_t HL = 0;
+    uint16_t PC = 0;
+    uint16_t SP = 0;
 };
 
-struct A : Register<8, offsetof(Registers, AF) + 0ULL>{};
-struct F : Register<8, offsetof(Registers, AF) + 1ULL>{};
-struct B : Register<8, offsetof(Registers, BC) + 0ULL>{};
-struct C : Register<8, offsetof(Registers, BC) + 1ULL>{};
-struct D : Register<8, offsetof(Registers, DE) + 0ULL>{};
-struct E : Register<8, offsetof(Registers, DE) + 1ULL>{};
-struct H : Register<8, offsetof(Registers, HL) + 0ULL>{};
-struct L : Register<8, offsetof(Registers, HL) + 1ULL>{};
+namespace Register
+{
 
-struct AF : Register<16, offsetof(Registers, AF)>{};
-struct BC : Register<16, offsetof(Registers, BC)>{};
-struct DE : Register<16, offsetof(Registers, DE)>{};
-struct HL : Register<16, offsetof(Registers, HL)>{};
+struct A : Registers::Register<8, offsetof(Registers, AF) + 0ULL> {};
+struct F : Registers::Register<8, offsetof(Registers, AF) + 1ULL> {};
+struct B : Registers::Register<8, offsetof(Registers, BC) + 0ULL> {};
+struct C : Registers::Register<8, offsetof(Registers, BC) + 1ULL> {};
+struct D : Registers::Register<8, offsetof(Registers, DE) + 0ULL> {};
+struct E : Registers::Register<8, offsetof(Registers, DE) + 1ULL> {};
+struct H : Registers::Register<8, offsetof(Registers, HL) + 0ULL> {};
+struct L : Registers::Register<8, offsetof(Registers, HL) + 1ULL> {};
+
+struct AF : Registers::Register<16, offsetof(Registers, AF)> {};
+struct BC : Registers::Register<16, offsetof(Registers, BC)> {};
+struct DE : Registers::Register<16, offsetof(Registers, DE)> {};
+struct HL : Registers::Register<16, offsetof(Registers, HL)> {};
+struct PC : Registers::Register<16, offsetof(Registers, PC)> {};
+struct SP : Registers::Register<16, offsetof(Registers, SP)> {};
+
+template<typename R> static constexpr bool is_register8_v = 
+       std::is_same_v<R, A>
+    || std::is_same_v<R, F>
+    || std::is_same_v<R, B>
+    || std::is_same_v<R, C>
+    || std::is_same_v<R, D>
+    || std::is_same_v<R, E>
+    || std::is_same_v<R, H>
+    || std::is_same_v<R, L>;
+
+template<typename R> static constexpr bool is_register16_v = 
+       std::is_same_v<R, AF>
+    || std::is_same_v<R, BC>
+    || std::is_same_v<R, DE>
+    || std::is_same_v<R, HL>
+    || std::is_same_v<R, PC>
+    || std::is_same_v<R, SP>;
+
+template<typename R> static constexpr bool is_register_v = 
+       is_register8_v<R>
+    || is_register16_v<R>;
+
+}
+
+
+
 
 }
