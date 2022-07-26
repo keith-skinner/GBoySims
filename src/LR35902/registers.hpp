@@ -10,24 +10,24 @@ namespace LR35902
 
 struct Registers
 {
-enum class Flags : uint8_t
-{
-    Z = 0b1000'0000,
-    N = 0b0100'0000,
-    H = 0b0010'0000,
-    C = 0b0001'0000,
-};
+    enum class Flags : uint8_t
+    {
+        Z = 0b1000'0000,
+        N = 0b0100'0000,
+        H = 0b0010'0000,
+        C = 0b0001'0000,
+    };
 
     constexpr std::underlying_type<Flags>::type to_value(Flags f) noexcept
     {
-    return static_cast<std::underlying_type<Flags>::type>(f);
-}
+        return static_cast<std::underlying_type<Flags>::type>(f);
+    }
 
-template<std::size_t B /*bit-depth*/, std::size_t O/*offset*/>
-struct Register 
-{
-    using size_t = bytes_to_uint_t<bits_to_bytes_v<B>>;
-};
+    template<std::size_t B /*bit-depth*/, std::size_t O/*offset*/>
+    struct Register 
+    {
+        using size_t = bytes_to_uint_t<bits_to_bytes_v<B>>;
+    };
 
     template<size_t Bits, size_t Offset>
     constexpr typename Register<Bits, Offset>::size_t read(const Register<Bits, Offset>) const
