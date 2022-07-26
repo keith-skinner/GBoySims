@@ -8,6 +8,8 @@
 namespace LR35902
 {
 
+struct Registers
+{
 enum class Flags : uint8_t
 {
     Z = 0b1000'0000,
@@ -16,7 +18,8 @@ enum class Flags : uint8_t
     C = 0b0001'0000,
 };
 
-constexpr std::underlying_type<Flags>::type to_value(Flags f) noexcept {
+    constexpr std::underlying_type<Flags>::type to_value(Flags f) noexcept
+    {
     return static_cast<std::underlying_type<Flags>::type>(f);
 }
 
@@ -25,9 +28,6 @@ struct Register
 {
     using size_t = bytes_to_uint_t<bits_to_bytes_v<B>>;
 };
-
-struct Registers
-{
 
     template<size_t Bits, size_t Offset>
     constexpr typename Register<Bits, Offset>::size_t read(const Register<Bits, Offset>) const
