@@ -21,21 +21,23 @@ target_compile_options(${PROJECT_NAME} PRIVATE
 
 target_sources(${PROJECT_NAME} PRIVATE
     src/main.cpp
-
     src/LR35902/registers.hpp
     src/LR35902/micro.hpp
     src/LR35902/instructions.hpp
     src/LR35902/utility/bits.hpp
 )
 
-add_executable(registers test/LR35902/registers.cpp)
-target_include_directories(registers PRIVATE ${PROJECT_SOURCE_DIR}/src)
-target_compile_features(registers PRIVATE cxx_std_20)
-target_compile_options(registers PRIVATE
+add_executable(LR35902 
+    test/LR35902/registers.cpp
+    test/LR35902/arguments.cpp
+)
+target_include_directories(LR35902 PRIVATE ${PROJECT_SOURCE_DIR}/src)
+target_compile_features(LR35902 PRIVATE cxx_std_20)
+target_compile_options(LR35902 PRIVATE
     $<$<CONFIG:DEBUG>:-Wall>
     $<$<CONFIG:DEBUG>:-Wextra>
     $<$<CONFIG:DEBUG>:-Wpedantic>
     -Wno-unknown-pragmas
 )
-target_link_libraries(registers gtest_main)
-add_test(NAME registers COMMAND example)
+target_link_libraries(LR35902 gtest_main)
+add_test(NAME LR35902 COMMAND example)
