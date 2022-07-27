@@ -37,8 +37,7 @@ using std::byteswap;
 template<std::integral T>
 constexpr T byteswap(T value) noexcept
 {
-    static_assert(std::has_unique_object_representations_v<T>,
-                  "T may not have padding bits");
+    static_assert(std::has_unique_object_representations_v<T>, "T may not have padding bits");
     auto value_representation = std::bit_cast<std::array<std::byte, sizeof(T)>>(value);
     std::ranges::reverse(value_representation);
     return std::bit_cast<T>(value_representation);
@@ -66,12 +65,10 @@ constexpr bool carry(std::unsigned_integral auto a, std::unsigned_integral auto 
 {
     static_assert(std::is_same_v<decltype(a), decltype(b)>, "a and b need to be the same type.");
     using T = decltype(a);
-    constexpr T all_bits = std::numeric_limits<T>::max();
-    constexpr T all_but_last_bit = (all_bits >> 1);
-    constexpr T last_bit = all_bits ^ all_but_last_bit;
-    constexpr bool alb = a & last_bit;
-    constexpr bool blb = b & last_bit;
-    constexpr bool ablb = (a + b) & last_bit;
+    constexpr T last_bit = (std::numeric_limits<T>::max() ^ (std::numeric_limits<T>::max() >> 1));
+    const bool alb = a & last_bit;
+    const bool blb = b & last_bit;
+    const bool ablb = (a + b) & last_bit;
     return (alb && blb && !ablb) || (!alb && !blb && ablb);
 }
 
