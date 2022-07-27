@@ -2,7 +2,6 @@
 #include <cstdint>
 #include <type_traits>
 #include <cstddef>
-
 #include "utility/bits.hpp"
 
 namespace LR35902
@@ -18,7 +17,7 @@ struct Registers
         C = 0b0001'0000,
     };
 
-    constexpr std::underlying_type<Flags>::type to_value(Flags f) noexcept
+    constexpr static std::underlying_type<Flags>::type to_value(Flags f) noexcept
     {
         return static_cast<std::underlying_type<Flags>::type>(f);
     }
@@ -28,6 +27,9 @@ struct Registers
     {
         using size_t = bytes_to_uint_t<bits_to_bytes_v<B>>;
     };
+
+    template<typename Z, typename N, typename H, typename C>
+    constexpr void flags(const Z z, const N n, const H h, const C c);
 
     template<size_t Bits, size_t Offset>
     constexpr typename Register<Bits, Offset>::size_t read(const Register<Bits, Offset>) const
@@ -50,6 +52,56 @@ struct Registers
     uint16_t PC = 0;
     uint16_t SP = 0;
 };
+
+template<typename T> constexpr
+std::underlying_type<Registers::Flags>::type 
+set_mask(const Registers::Flags f, const T v);
+
+template<> constexpr
+std::underlying_type<Registers::Flags>::type
+set_mask<int>(const Registers::Flags f, const int v) 
+{ 
+    return v == 1 ? Registers::to_value(f) : 0;
+}
+
+template<> constexpr
+std::underlying_type<Registers::Flags>::type
+set_mask<bool>(const Registers::Flags f, const bool v)
+{
+    return v ? Registers::to_value(f) : 0;
+}
+
+template<> constexpr
+std::underlying_type<Registers::Flags>::type
+set_mask<char>(const Registers::Flags, const char)
+{
+    return 0;
+}
+
+template<typename T> constexpr
+std::underlying_type<Registers::Flags>::type
+leave_mask(const Registers::Flags f, const T v);
+
+template<> constexpr
+std::underlying_type<Registers::Flags>::type
+leave_mask<int>(const Registers::Flags, const int) 
+{ 
+    return 0;
+}
+
+template<> constexpr
+std::underlying_type<Registers::Flags>::type
+leave_mask<bool>(const Registers::Flags, const bool)
+{
+    return 0;
+}
+
+template<> constexpr
+std::underlying_type<Registers::Flags>::type
+leave_mask<char>(const Registers::Flags f, const char)
+{
+    return Registers::to_value(f);
+}
 
 namespace Register
 {
@@ -94,7 +146,23 @@ template<typename R> static constexpr bool is_register_v =
 
 }
 
+constexpr unsigned int get_bit(uint8_t n, int b)
+{
+    uint8_t t1 = n << (7-b);
+    uint8_t t2 = t1 >> 7;
+    return t2;
+}
 
+template<typename Z, typename N, typename H, typename C>
+constexpr void Registers::flags(const Z z, const N n, const H h, const C c)
+{
+    using namespace Register;
+    using flags_t = std::underlying_type<Flags>::type;
+
+    const flags_t set = set_mask(Flags::Z, z) | set_mask(Flags::N, n) | set_mask(Flags::H, h) | set_mask(Flags::C, c);
+    const flags_t leave = leave_mask(Flags::Z, z) | leave_mask(Flags::N, n) | leave_mask(Flags::H, h) | leave_mask(Flags::C, c);
+    write(F{}, (read(F{}) & leave) | set);
+}
 
 
 }

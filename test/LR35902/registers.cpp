@@ -110,3 +110,38 @@ GTEST_TEST(Registers, RegistersTypeTraits)
     EXPECT_EQ(is_register16_v<HL>, true);
     EXPECT_EQ(is_register16_v<int>, false);
 }
+
+GTEST_TEST(Registers, flags)
+{
+    using namespace LR35902;
+    
+    // Flags register starts off as 0
+    Registers regs;
+    EXPECT_EQ(regs.read(Register::F{}), (0b0000u << 4));
+
+    // flags function connected to Register F
+    regs.flags(1, 1, 1, 1);
+    EXPECT_EQ(regs.read(Register::F{}), (0b1111u << 4));
+
+    // Flags register will be 0s if set to all 0s
+    regs.flags(0, 0, 0, 0);
+    EXPECT_EQ(regs.read(Register::F{}), (0b0000u << 4));
+
+    // Flags register can also be set with booleans
+    regs.flags(true, true, true, true);
+    EXPECT_EQ(regs.read(Register::F{}), (0b1111u << 4));
+
+    // Flags register can also be set with booleans
+    regs.flags(false, false, false, false);
+    EXPECT_EQ(regs.read(Register::F{}), (0b0000u << 4));
+
+    // Flag value doesn't change with a '-'
+    regs.write(Register::F{}, 0b1010 << 4);
+    regs.flags('-', '-', '-', '-');
+    EXPECT_EQ(regs.read(Register::F{}), (0b1010u << 4));
+
+    // Flags should be able to be modified independently
+    regs.write(Register::F{}, 0b0101 << 4);
+    regs.flags(1, false, true, '-');
+    EXPECT_EQ(regs.read(Register::F{}), (0b1011u << 4));
+}
