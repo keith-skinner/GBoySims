@@ -1,8 +1,6 @@
-#pragma once
-#include <array>
+#include "rom.hpp"
 
-constexpr auto ROMSIZE = 0x00FF;
-std::array<ROMSIZE> rom {
+std::array<uint8_t, ROMSIZE> rom {
 // INIT RAM
     0x31, 0xfe, 0xff,   // LD SP,$fffe      ; $0000 Setup Stack
 //Zero the memory from $9FFF-$8000 (VRAM)

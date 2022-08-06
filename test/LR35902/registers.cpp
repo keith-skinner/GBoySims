@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 #include <LR35902/registers.hpp>
-#include <LR35902/utility/bits.hpp>
+#include <utility/bits.hpp>
 
 template<typename R8>
 void access_test(const typename R8::size_t value)
@@ -33,22 +33,26 @@ void access_test()
     Registers regs;
     using T = typename R16::size_t;
 
-    // Can be updated
+    // Expect registers to be zero on init
+    EXPECT_EQ(regs.read(R16{}), 0x00);
+    EXPECT_EQ(regs.read(R8H{}), 0x00);
+    EXPECT_EQ(regs.read(R8L{}), 0x00);
+
+    // Expect registers to persist writes
     const T init = to_little_endian(T{0x1234});
     regs.write(R16{}, init);
     EXPECT_NE(regs.read(R16{}), 0x0000);
+    EXPECT_EQ(regs.read(R16{}), 0x1234);
+    EXPECT_EQ(regs.read(R16{}), 0x1234);
+
+    // Expect registers to overwrite values
     regs.write(R16{}, 0x0000);
     EXPECT_EQ(regs.read(R16{}), 0x0000);
     EXPECT_EQ(regs.read(R8L{}), 0x00);
     EXPECT_EQ(regs.read(R8H{}), 0x00);
 
-    // Updated value is correct
-    const T value = to_little_endian(T{0x1234});
-    regs.write(R16{}, value);
-    const T new_value = regs.read(R16{});
-    EXPECT_EQ(new_value, value);
-
-    // Sub registers are correct
+    // Expect sub registers to have correct endianess
+    regs.write(R16{}, 0x1234);
     EXPECT_EQ(regs.read(R8H{}), 0x12);
     EXPECT_EQ(regs.read(R8L{}), 0x34);
 }
@@ -64,6 +68,7 @@ GTEST_TEST(Registers, Register16Access)
 
 GTEST_TEST(Registers, RegistersTypeTraits)
 {
+    // int is used here to show that no random type will work and needs to be exactly these types
     using namespace LR35902::Register;
     EXPECT_EQ(is_register_v<A>, true);
     EXPECT_EQ(is_register_v<F>, true);
@@ -115,33 +120,77 @@ GTEST_TEST(Registers, flags)
 {
     using namespace LR35902;
     
-    // Flags register starts off as 0
+    // Expect Flags (Status) register to be 0 on init 
     Registers regs;
     EXPECT_EQ(regs.read(Register::F{}), (0b0000u << 4));
+    EXPECT_FALSE(regs.test(Registers::Flags::Z));
+    EXPECT_FALSE(regs.test(Registers::Flags::N));
+    EXPECT_FALSE(regs.test(Registers::Flags::H));
+    EXPECT_FALSE(regs.test(Registers::Flags::C));
 
-    // flags function connected to Register F
+    // Expect Flags register to be set to 0xF0 when all flags are set
     regs.flags(1, 1, 1, 1);
-    EXPECT_EQ(regs.read(Register::F{}), (0b1111u << 4));
+    EXPECT_EQ(regs.read(Register::F{}), (0b1111'0000u));
+    EXPECT_TRUE(regs.test(Registers::Flags::Z));
+    EXPECT_TRUE(regs.test(Registers::Flags::N));
+    EXPECT_TRUE(regs.test(Registers::Flags::H));
+    EXPECT_TRUE(regs.test(Registers::Flags::C));
 
-    // Flags register will be 0s if set to all 0s
+    // Expect Flags register to be set to 0x00 when all flags are unset
     regs.flags(0, 0, 0, 0);
-    EXPECT_EQ(regs.read(Register::F{}), (0b0000u << 4));
+    EXPECT_EQ(regs.read(Register::F{}), (0b0000'0000u));
+    EXPECT_FALSE(regs.test(Registers::Flags::Z));
+    EXPECT_FALSE(regs.test(Registers::Flags::N));
+    EXPECT_FALSE(regs.test(Registers::Flags::H));
+    EXPECT_FALSE(regs.test(Registers::Flags::C));
 
-    // Flags register can also be set with booleans
+    // Expect flags set with true to be set in F register
     regs.flags(true, true, true, true);
-    EXPECT_EQ(regs.read(Register::F{}), (0b1111u << 4));
+    EXPECT_EQ(regs.read(Register::F{}), (0b1111'0000u));
+    EXPECT_TRUE(regs.test(Registers::Flags::Z));
+    EXPECT_TRUE(regs.test(Registers::Flags::N));
+    EXPECT_TRUE(regs.test(Registers::Flags::H));
+    EXPECT_TRUE(regs.test(Registers::Flags::C));
 
-    // Flags register can also be set with booleans
+    // Expect flags set with flase to be unset in F register
     regs.flags(false, false, false, false);
-    EXPECT_EQ(regs.read(Register::F{}), (0b0000u << 4));
+    EXPECT_EQ(regs.read(Register::F{}), (0b0000'0000u));
+    EXPECT_FALSE(regs.test(Registers::Flags::Z));
+    EXPECT_FALSE(regs.test(Registers::Flags::N));
+    EXPECT_FALSE(regs.test(Registers::Flags::H));
+    EXPECT_FALSE(regs.test(Registers::Flags::C));
 
-    // Flag value doesn't change with a '-'
-    regs.write(Register::F{}, 0b1010 << 4);
+    // Expect flag values to be independent of each other
+    regs.flags(0, 1, 0, 1);
+    EXPECT_EQ(regs.read(Register::F{}), (0b0101'0000u));
+    EXPECT_FALSE(regs.test(Registers::Flags::Z));
+    EXPECT_TRUE(regs.test(Registers::Flags::N));
+    EXPECT_FALSE(regs.test(Registers::Flags::H));
+    EXPECT_TRUE(regs.test(Registers::Flags::C));
+    regs.flags(1, 0, 1, 0);
+    EXPECT_EQ(regs.read(Register::F{}), (0b1010'0000u));
+    EXPECT_TRUE(regs.test(Registers::Flags::Z));
+    EXPECT_FALSE(regs.test(Registers::Flags::N));
+    EXPECT_TRUE(regs.test(Registers::Flags::H));
+    EXPECT_FALSE(regs.test(Registers::Flags::C));
+    regs.flags(false, true, false, true);
+    EXPECT_EQ(regs.read(Register::F{}), (0b0101'0000u));
+    EXPECT_FALSE(regs.test(Registers::Flags::Z));
+    EXPECT_TRUE(regs.test(Registers::Flags::N));
+    EXPECT_FALSE(regs.test(Registers::Flags::H));
+    EXPECT_TRUE(regs.test(Registers::Flags::C));
+    regs.flags(true, false, true, false);
+    EXPECT_EQ(regs.read(Register::F{}), (0b1010'0000u));
+    EXPECT_TRUE(regs.test(Registers::Flags::Z));
+    EXPECT_FALSE(regs.test(Registers::Flags::N));
+    EXPECT_TRUE(regs.test(Registers::Flags::H));
+    EXPECT_FALSE(regs.test(Registers::Flags::C));
+
+    // Expect Flag values to not change when set with '-'
     regs.flags('-', '-', '-', '-');
-    EXPECT_EQ(regs.read(Register::F{}), (0b1010u << 4));
-
-    // Flags should be able to be modified independently
-    regs.write(Register::F{}, 0b0101 << 4);
-    regs.flags(1, false, true, '-');
-    EXPECT_EQ(regs.read(Register::F{}), (0b1011u << 4));
+    EXPECT_EQ(regs.read(Register::F{}), (0b1010'0000u));
+    EXPECT_TRUE(regs.test(Registers::Flags::Z));
+    EXPECT_FALSE(regs.test(Registers::Flags::N));
+    EXPECT_TRUE(regs.test(Registers::Flags::H));
+    EXPECT_FALSE(regs.test(Registers::Flags::C));
 }

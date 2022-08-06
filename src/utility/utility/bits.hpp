@@ -44,6 +44,12 @@ constexpr T byteswap(T value) noexcept
 }
 #endif // __cpp_lib_byteswap
 
+constexpr uint8_t nibbleswap(const uint8_t value)
+{
+    return ((value & 0x0F) << 4)
+         | ((value & 0xF0) >> 4); 
+}
+
 constexpr bool is_native_endian(std::endian v)
 {
     return std::endian::native == v;
@@ -65,19 +71,25 @@ constexpr bool carry(std::unsigned_integral auto a, std::unsigned_integral auto 
 {
     static_assert(std::is_same_v<decltype(a), decltype(b)>, "a and b need to be the same type.");
     using T = decltype(a);
-    constexpr T last_bit = (std::numeric_limits<T>::max() ^ (std::numeric_limits<T>::max() >> 1));
-    const bool alb = a & last_bit;
-    const bool blb = b & last_bit;
-    const bool ablb = (a + b) & last_bit;
+    constexpr T check_bit = (std::numeric_limits<T>::max() ^ (std::numeric_limits<T>::max() >> 1));
+    const bool alb = a & check_bit;
+    const bool blb = b & check_bit;
+    const bool ablb = (a + b) & check_bit;
     return (alb && blb && !ablb) || (!alb && !blb && ablb);
 }
 
-constexpr bool half_carry(std::uint8_t a, std::uint8_t b)
+constexpr bool half_carry(const std::unsigned_integral auto a, const std::unsigned_integral auto b)
 {
-    return (((a & 0x0F) + (b & 0x0F)) & 0x10) == 0x10;
+    static_assert(std::is_same_v<decltype(a), decltype(b)>, "a and b need to be the same type.");
+    using T = decltype(a);
+    constexpr T check_bit = (std::numeric_limits<T>::max() ^ (std::numeric_limits<T>::max() >> 1)) >> 4;
+    const bool alb = a & check_bit;
+    const bool blb = b & check_bit;
+    const bool ablb = (a + b) & check_bit;
+    return (alb && blb && !ablb) || (!alb && !blb && ablb);
 }
 
-constexpr bool half_carry(std::uint16_t a, std::uint16_t b)
+constexpr bool half_carry(const std::uint16_t a, const std::uint16_t b)
 {
     return (((a & 0x0FFF) + (b & 0x0FFF)) & 0x1000) == 0x1000;
 }

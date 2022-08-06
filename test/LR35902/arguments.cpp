@@ -1,5 +1,5 @@
 #include <gtest/gtest.h>
-#include <LR35902/utility/bits.hpp>
+#include <utility/bits.hpp>
 #include <LR35902/arguments.hpp>
 
 GTEST_TEST(Arguments, getOffset)

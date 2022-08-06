@@ -2,7 +2,7 @@
 #include <cstdint>
 #include <type_traits>
 #include <cstddef>
-#include "utility/bits.hpp"
+#include <utility/bits.hpp>
 
 namespace LR35902
 {
@@ -31,18 +31,25 @@ struct Registers
     template<typename Z, typename N, typename H, typename C>
     constexpr void flags(const Z z, const N n, const H h, const C c);
 
-    template<size_t Bits, size_t Offset>
-    constexpr typename Register<Bits, Offset>::size_t read(const Register<Bits, Offset>) const
+    constexpr bool test(const Flags f) const;
+
+    template<size_t Bits, size_t Offset> constexpr auto 
+    read(const Register<Bits, Offset> reg) const
+    -> decltype(reg)::size_t
     {
+        using T = typename Register<Bits, Offset>::size_t;
         const uintptr_t pos = reinterpret_cast<uintptr_t>(this) + Offset;
-        return *reinterpret_cast<typename Register<Bits, Offset>::size_t *>(pos);
+        const T value = *reinterpret_cast<typename Register<Bits, Offset>::size_t *>(pos);
+        return to_native_endian(value);
     }
 
-    template<size_t Bits, size_t Offset>
-    constexpr void write(const Register<Bits, Offset>, const typename Register<Bits, Offset>::size_t value)
+    template<size_t Bits, size_t Offset> constexpr void 
+    write(const Register<Bits, Offset>, const typename Register<Bits, Offset>::size_t value)
     {
+        using T = typename Register<Bits, Offset>::size_t;
+        const T new_value = to_little_endian(value);
         const uintptr_t pos = reinterpret_cast<uintptr_t>(this) + Offset;
-        *(reinterpret_cast<typename Register<Bits, Offset>::size_t *>(pos)) = value;
+        *(reinterpret_cast<typename Register<Bits, Offset>::size_t *>(pos)) = new_value;
     }
 
     uint16_t AF = 0;
@@ -106,21 +113,21 @@ leave_mask<char>(const Registers::Flags f, const char)
 namespace Register
 {
 
-struct A : Registers::Register<8, offsetof(Registers, AF) + 0ULL> {};
-struct F : Registers::Register<8, offsetof(Registers, AF) + 1ULL> {};
-struct B : Registers::Register<8, offsetof(Registers, BC) + 0ULL> {};
-struct C : Registers::Register<8, offsetof(Registers, BC) + 1ULL> {};
-struct D : Registers::Register<8, offsetof(Registers, DE) + 0ULL> {};
-struct E : Registers::Register<8, offsetof(Registers, DE) + 1ULL> {};
-struct H : Registers::Register<8, offsetof(Registers, HL) + 0ULL> {};
-struct L : Registers::Register<8, offsetof(Registers, HL) + 1ULL> {};
+struct A : public Registers::Register<8, offsetof(Registers, AF) + 0ULL> {};
+struct F : public Registers::Register<8, offsetof(Registers, AF) + 1ULL> {};
+struct B : public Registers::Register<8, offsetof(Registers, BC) + 0ULL> {};
+struct C : public Registers::Register<8, offsetof(Registers, BC) + 1ULL> {};
+struct D : public Registers::Register<8, offsetof(Registers, DE) + 0ULL> {};
+struct E : public Registers::Register<8, offsetof(Registers, DE) + 1ULL> {};
+struct H : public Registers::Register<8, offsetof(Registers, HL) + 0ULL> {};
+struct L : public Registers::Register<8, offsetof(Registers, HL) + 1ULL> {};
 
-struct AF : Registers::Register<16, offsetof(Registers, AF)> {};
-struct BC : Registers::Register<16, offsetof(Registers, BC)> {};
-struct DE : Registers::Register<16, offsetof(Registers, DE)> {};
-struct HL : Registers::Register<16, offsetof(Registers, HL)> {};
-struct PC : Registers::Register<16, offsetof(Registers, PC)> {};
-struct SP : Registers::Register<16, offsetof(Registers, SP)> {};
+struct AF : public Registers::Register<16, offsetof(Registers, AF)> {};
+struct BC : public Registers::Register<16, offsetof(Registers, BC)> {};
+struct DE : public Registers::Register<16, offsetof(Registers, DE)> {};
+struct HL : public Registers::Register<16, offsetof(Registers, HL)> {};
+struct PC : public Registers::Register<16, offsetof(Registers, PC)> {};
+struct SP : public Registers::Register<16, offsetof(Registers, SP)> {};
 
 template<typename R> static constexpr bool is_register8_v = 
        std::is_same_v<R, A>
@@ -164,5 +171,10 @@ constexpr void Registers::flags(const Z z, const N n, const H h, const C c)
     write(F{}, (read(F{}) & leave) | set);
 }
 
+constexpr bool Registers::test(const Flags f) const
+{
+    using namespace Register;
+    return to_value(f) & read(F{});
+}
 
 }
