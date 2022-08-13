@@ -8,12 +8,16 @@ struct Opcode {
     bool CB;
     const std::string_view name;
     const int length;
-    const int cycles_success;
-    const int cycles_failure = 0;
+    const int cycles_action;
+    const int cycles_no_action = 0;
 };
 
-// (BC) means to derefference the address given by BC
-// (a16) means to dereferrence the address given by a16
+// (C) means to derefference the offset given by C from the base address 0xFF00
+// (a8) means to derefference the offset given by a8 (an immediate) from the base address 0xFF00
+// (BC) means to derefference the address given by BC or other 16-bit registers
+// (a16) means to dereferrence the address given by a16 (an immediate)
+// (HL+) means to dereferrence the addresss given by HL and then increment HL
+// (HL-) means to dereferrence the addresss given by HL and then decrement HL
 constexpr std::array<Opcode, 256> opcodes {{
     {0x00, false, "NOP", 1, 4},
     {0x01, false, "LD BC, d16", 3, 12},
@@ -223,32 +227,32 @@ constexpr std::array<Opcode, 256> opcodes {{
     {0xC1, false, "POP BC", 1, 12},
     {0xC2, false, "JP NZ, a16", 3, 16, 12},
     {0xC3, false, "JP a16", 3, 16},
-    {0xC4, false, "CALL NZ, a16", 3, 24},
+    {0xC4, false, "CALL NZ, a16", 3, 24, 12},
     {0xC5, false, "PUSH BC", 1, 16},
     {0xC6, false, "ADD A, d8", 2, 8},
     {0xC7, false, "RST 00H", 1, 16},
-    {0xC8, false, "RET Z", 1, 20},
+    {0xC8, false, "RET Z", 1, 20, 8},
     {0xC9, false, "RET", 1, 16},
-    {0xCA, false, "JP Z, a16", 3, 16},
+    {0xCA, false, "JP Z, a16", 3, 16, 12},
     {0xCB, false, "PREFIX", 1, 4},
-    {0xCC, false, "CALL Z, a16", 3, 24},
+    {0xCC, false, "CALL Z, a16", 3, 24, 12},
     {0xCD, false, "CALL a16", 3, 24},
     {0xCE, false, "ADC A, d8", 2, 8},
     {0xCF, false, "RST 08H", 1, 16},
     //
-    {0xD0, false, "RET NC", 1, 20},
+    {0xD0, false, "RET NC", 1, 20, 8},
     {0xD1, false, "POP DE", 1, 12},
-    {0xD2, false, "JP NC, a16", 3, 16},
+    {0xD2, false, "JP NC, a16", 3, 16, 12},
     {0xD3, false, "ILLEGAL_D3", 1, 4},
-    {0xD4, false, "CALL NC, a16", 3, 24},
+    {0xD4, false, "CALL NC, a16", 3, 24, 12},
     {0xD5, false, "PUSH DE", 1, 16},
     {0xD6, false, "SUB d8", 2, 8},
     {0xD7, false, "RST 10H", 1, 16},
-    {0xD8, false, "RET C", 1, 20},
+    {0xD8, false, "RET C", 1, 20, 8},
     {0xD9, false, "RETI", 1, 16},
-    {0xDA, false, "JP C, a16", 3, 16},
+    {0xDA, false, "JP C, a16", 3, 16, 12},
     {0xDB, false, "ILLEGAL_DB", 1, 4},
-    {0xDC, false, "CALL C, a16", 3, 24},
+    {0xDC, false, "CALL C, a16", 3, 24, 12},
     {0xDD, false, "ILLEGAL_DD", 1, 4},
     {0xDE, false, "SBC A, d8", 2, 8},
     {0xDF, false, "RST 18H", 1, 16},
