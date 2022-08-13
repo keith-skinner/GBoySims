@@ -4,18 +4,71 @@
 namespace LR35902
 {
 
-void Cpu::run()
-{
+constexpr bool run(const Opcode& code, micro::Alu& alu, const std::uint16_t arg);
 
+uint16_t read_byte(const Component& component, const uint16_t addr)
+{
+    return component.read(addr);
 }
 
-bool illegal(const Opcode code)
+uint16_t read_word(const Component& component, const uint16_t addr)
+{
+    const uint8_t b0 = component.read(addr);
+    const uint8_t b1 = component.read(addr+1);
+    const uint16_t word = to_native_endian(b0, b1);
+}
+
+constexpr bool has_argument(const Opcode& code)
+{
+    return (!code.CB && code.length != 1);
+}
+
+constexpr uint16_t argument(const Opcode& code, const Component& component, const uint16_t loc)
+{
+    if (code.length == 2)
+        return read_byte(component, loc);
+    else
+        return read_word(component, loc);
+}
+
+Opcode Cpu::instruction() const
+{
+    return decode();
+}
+
+std::uint16_t Cpu::argument() const
+{
+    Opcode code = instruction();
+    return has_argument(code)
+        ? LR35902::argument(code, component, PC()+1) 
+        : 0x0000u;
+}
+
+Opcode Cpu::decode() const
+{
+    uint8_t code = read_byte(component, PC());
+    return code == 0xCB
+        ? cb_opcodes.at(read_byte(component, PC()+1))
+        : opcodes.at(code);
+}
+
+void Cpu::run()
+{
+    const Opcode opcode = decode();
+    const uint16_t argument = has_argument(opcode) 
+        ? LR35902::argument(opcode, component, PC()+1)
+        : 0x0000u;
+    bool cycles = LR35902::run(opcode, alu, argument);
+    
+}
+
+bool illegal(const Opcode& code)
 {
     throw std::runtime_error("Attempted to run illegal opcode: 0x" + to_hex(code.code));
     return true;
 }
 
-constexpr bool run(const Opcode code, micro::Alu& alu, std::uint16_t arg = 0x0000)
+constexpr bool run(const Opcode& code, micro::Alu& alu, const std::uint16_t arg)
 {
     if (!code.CB)
     {
