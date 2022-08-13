@@ -4,12 +4,16 @@
 #include "opcodes.hpp"
 #include "micro.hpp"
 #include "arguments.hpp"
+#include <components/component.hpp>
 
 namespace LR35902
 {
 
 struct Cpu
 {
+    Cpu(Component& component)
+    : regs{}, component{component}, alu{regs, component}
+    {}
 
     void run();
 
@@ -39,7 +43,11 @@ struct Cpu
     std::uint16_t /*native endian*/ argument() const;
 
 private:
+    Opcode decode() const;
+    bool run(const Opcode&);
+
     Registers regs;
+    Component& component;
     micro::Alu alu;
     bool break_ = false;
 
