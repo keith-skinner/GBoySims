@@ -35,12 +35,15 @@ struct Cpu
     bool HF() const { return regs.test(LR35902::Registers::Flags::H); }
     bool CF() const { return regs.test(LR35902::Registers::Flags::C); }
 
+    Opcode instruction() const;
+    std::uint16_t /*native endian*/ argument() const;
+
 private:
     Registers regs;
     micro::Alu alu;
     bool break_ = false;
-    Opcode current{};
-    uint16_t arg{};
+
+    
 };
 
 }
