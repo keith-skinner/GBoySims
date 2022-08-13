@@ -60,7 +60,7 @@ public:
     Component(Component&&) noexcept = default;
     Component& operator=(Component&&) noexcept = default;
 
-    std::uint8_t read(std::uint16_t addr)
+    std::uint8_t read(std::uint16_t addr) const
     {
         if (!is_valid(addr))
             throw std::invalid_argument("addr needs to be between 0x" + to_hex(begin()) + " and 0x" + to_hex(end()) + ". addr: 0x" + to_hex(addr));
