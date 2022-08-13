@@ -62,9 +62,19 @@ constexpr auto to_little_endian(const std::unsigned_integral auto v) -> decltype
     return v;
 }
 
-constexpr auto to_native_endian(const std::unsigned_integral auto v) ->decltype(v)
+constexpr auto to_native_endian(const std::unsigned_integral auto v) -> decltype(v)
 {
     return to_little_endian(v);
+}
+
+constexpr auto to_little_endian(const uint8_t b0, const uint8_t b1) -> uint16_t
+{
+    return static_cast<uint16_t>(b0) | (static_cast<uint16_t>(b1) << 8);
+}
+
+constexpr auto to_native_endian(const uint8_t b0, const uint8_t b1) -> uint16_t
+{
+    return to_native_endian(to_little_endian(b0, b1));
 }
 
 constexpr bool carry(std::unsigned_integral auto a, std::unsigned_integral auto b)
