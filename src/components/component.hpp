@@ -6,6 +6,21 @@
 #include <functional>
 #include <utility/hex.hpp>
 
+struct bad_read_address : std::invalid_argument
+{
+    using std::invalid_argument::invalid_argument;
+    bad_read_address(std::string_view component, uint16_t addr)
+    : invalid_argument(std::string(component.size(), component.length()) + " invalid read at address: " + to_hex(addr))
+    {}
+};
+
+struct bad_write_address : std::invalid_argument
+{
+    using std::invalid_argument::invalid_argument;
+    bad_write_address(std::string_view component, uint16_t addr)
+    : invalid_argument(std::string(component.size(), component.length()) + " invalid write at address: " + to_hex(addr))
+    {}
+};
 
 struct ComponentConcept
 {
@@ -37,23 +52,17 @@ class Component
 {
 public:
     template<typename T>
-    Component(T t, const std::uint16_t begin, const std::uint16_t end)
+    Component(T t)
     : component{std::make_unique<ComponentModel<T>>(std::move(t))}
-    , begin_{begin}
-    , end_{end}
     {}
 
     Component(const Component& other)
     : component{other.component->clone()}
-    , begin_{other.begin_}
-    , end_{other.end_}
     {}
 
     Component& operator=(const Component& other)
     {
         component.reset(other.component->clone().release());
-        begin_ = other.begin_;
-        end_ = other.end_;
         return *this;
     }
 
@@ -62,28 +71,15 @@ public:
 
     std::uint8_t read(std::uint16_t addr) const
     {
-        if (!is_valid(addr))
-            throw std::invalid_argument("addr needs to be between 0x" + to_hex(begin()) + " and 0x" + to_hex(end()) + ". addr: 0x" + to_hex(addr));
         return component->read(addr);
     }
     void write(std::uint16_t addr, std::uint8_t value)
     {
-        if (!is_valid(addr))
-            throw std::invalid_argument("addr needs to be between 0x" + to_hex(begin()) + " and 0x" + to_hex(end()) + ". addr: 0x" + to_hex(addr));
         return component->write(addr, value);
     }
 
-    bool is_valid(const std::uint16_t addr) const
-    {
-        return begin() <= addr && addr <= end();
-    }
-    std::uint16_t begin() const { return begin_; }
-    std::uint16_t end() const { return end_; }
-
 private:
     std::unique_ptr<ComponentConcept> component;
-    std::uint16_t begin_;
-    std::uint16_t end_;
 };
 
 namespace Components {
