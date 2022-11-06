@@ -1,6 +1,6 @@
 #pragma once
-#include "endian.hpp"
 #include <common/arguments.hpp>
+#include "endian.hpp"
 
 /***
  * The intention of this file is to create a system for the multiple types of arguments that can appear for opcodes
@@ -16,25 +16,27 @@
 namespace LR35902::Access
 {
 
-using ::Arguments::Access::a_immediate;
-using ::Arguments::Access::a_reference;
-using ::Arguments::Access::a_arg_access;
 
-using Immediate = ::Arguments::Access::immediate_t<nat16_t>;
+using common::Arguments::Access::a_immediate;
+using common::Arguments::Access::a_reference;
+using common::Arguments::Access::a_arg_access;
+
+using Immediate = common::Arguments::Access::immediate_t<nat16_t>;
 template<nat16_t::Type Offset>
-using Memory = ::Arguments::Access::memory_t<nat16_t, nat16_t::Type, Offset>;
+using Memory = common::Arguments::Access::memory_t<nat16_t, nat16_t::Type, Offset>;
 using Reference = Memory<0x0000>;
 using zReference = Memory<0xFF00>;
+
 
 } // namespace LR35902::Access
 //Type is either Immediate or via Register
 namespace LR35902::Type
 {
 
-using ::Arguments::Type::a_immediate;
 
 template<typename T>
-using Immediate = ::Arguments::Type::immediate_t<T>;
+using Immediate = common::Arguments::Type::immediate_t<T>;
+using common::Arguments::Type::a_immediate;
 
 enum class Name : std::uint8_t
 {
@@ -44,10 +46,10 @@ enum class Name : std::uint8_t
 
 template<Name R, std::unsigned_integral T>
 struct Register
-:   ::Arguments::Type::register_t<T>
+:   common::Arguments::Type::register_t<T>
 {
     static constexpr Name name = R;
-    using ::Arguments::Type::register_t<T>::Type;
+    using common::Arguments::Type::register_t<T>::Type;
 };
 
 // Immediate Data Types
@@ -90,31 +92,16 @@ concept a_register = a_register8<T> || a_register16<T>;
 
 template <typename T>
 concept a_arg_type = a_immediate<T> || a_register<T>;
+
+
 } // namespace LR35902::Type
 //Type is a merging of Access and Type
 namespace LR35902::Args
 {
 
-template<
-    LR35902::Type::a_arg_type T,
-    LR35902::Access::a_arg_access A>
-struct Argument {
-    using Type = T;
-    using Access = A;
 
-    constexpr Argument() = default;
-    constexpr Argument(const size_t value)
-    :   type{value}
-    {}
-
-    const Type type = {};
-    // will never be instantiating an access
-    // type includes the raw data or memory address being accessed
-    // therefore it needs to be instantiated sometimes
-    // if type is a register it doesn't need to be accessed and the
-    // required info can be deduced at compile time
-};
-
+template<LR35902::Type::a_arg_type T, LR35902::Access::a_arg_access A>
+using Argument = common::Arguments::argument_t<T, A>;
 
 //LR35902 Specific
 // 8-bit register arguments
@@ -171,6 +158,8 @@ static constexpr bool is_immreg16_v =
     || std::is_same_v<T, SP>;
 template<typename T>
 concept a_immreg16_v = is_immreg16_v<T>;
+
+
 
 template <typename T>
 static constexpr bool is_std_arg_v =

@@ -1,7 +1,7 @@
 #pragma once
 #include <concepts>
 
-namespace Arguments::Access
+namespace common::Arguments::Access
 {
 
 
@@ -34,7 +34,7 @@ concept a_arg_access = a_immediate<T> || a_reference<T>;
 
 
 } // namespace Arguments::Access
-namespace Arguments::Type
+namespace common::Arguments::Type
 {
 
 template <std::integral T>
@@ -65,7 +65,27 @@ concept a_register = is_register_v<T>;
 
 
 } // namespace Arguments::Type
-namespace Aruguments::Argument
+namespace common::Arguments
 {
-    
-}
+
+template<
+    typename T,
+    typename A>
+struct argument_t {
+    using Type = T;
+    using Access = A;
+
+    constexpr argument_t() = default;
+    constexpr argument_t(const size_t value)
+    :   type{value}
+    {}
+
+    const Type type = {};
+    // will never be instantiating an access
+    // type includes the raw data or memory address being accessed
+    // therefore it needs to be instantiated sometimes
+    // if type is a register it doesn't need to be accessed and the
+    // required info can be deduced at compile time
+};
+
+} // namespace common::Arguments::Argument
