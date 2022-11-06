@@ -11,6 +11,44 @@
 namespace common
 {
 
+struct can_preincrement
+{
+    template <typename Derived, typename ValueType>
+    struct mixin
+    {
+        friend Derived & operator++(Derived & self)
+            noexcept (noexcept(++std::declval<ValueType&>()))
+        {
+            ++self.underlying_value();
+            return self;
+        }
+    };
+};
+
+struct can_postincrementable
+{
+    template <typename Derived, typename ValueType>
+    struct mixin
+    {
+        friend Derived& operator++(Derived & self, int)
+            noexcept (noexcept(std::declval<ValueType&>()++))
+        {
+            ValueType value = self;
+            ++self.underlying_value();
+            return value;
+        }
+    };
+};
+
+struct can_increment {
+    template<typename Derived, typename ValueType>
+    struct mixin
+    :   pre_incrementable::template mixin<Derived, ValueType>,
+        post_incrementable::template mixin<Derived, ValueType>
+    {
+    };
+};
+
 /* https://www.youtube.com/watch?v=b1Gq9WABaRU&ab_channel=CppNow */
 template<typename Tag, typename Type, typename ... Properties>
 class strong_typedef
