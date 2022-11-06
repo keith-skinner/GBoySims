@@ -1,0 +1,22 @@
+add_library(LR35902 INTERFACE)
+target_sources(
+    LR35902
+    INTERFACE
+    arguments.hpp
+    endian.hpp
+    registers.hpp
+
+    # cpu.hpp
+    # micro.hpp
+    # opcodes.hpp
+)
+target_link_libraries(
+    LR35902
+    INTERFACE
+    common
+)
+target_include_directories(
+    LR35902
+    INTERFACE
+    ${CMAKE_CURRENT_SOURCE_DIR} 
+)

@@ -1,0 +1,26 @@
+add_executable(
+    test_lr35902
+    # Files ordered in order of logical conclusion
+    LR35902/endian.cpp
+    LR35902/arguments.cpp
+    LR35902/registers.cpp
+)
+target_compile_features(
+    test_lr35902
+    PRIVATE
+    cxx_std_20)
+target_compile_options(
+    test_lr35902
+    PRIVATE
+    $<$<CONFIG:DEBUG>:-Wall>
+    $<$<CONFIG:DEBUG>:-Wextra>
+    $<$<CONFIG:DEBUG>:-Wpedantic>
+    -Wno-unknown-pragmas
+    -fconcepts-diagnostics-depth=8
+)
+target_link_libraries(
+    test_lr35902
+    PRIVATE
+    LR35902
+    gtest_main
+)
