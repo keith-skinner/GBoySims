@@ -113,7 +113,7 @@ public:
      */
     template<typename SubRegister>
     [[nodiscard]]
-    static constexpr bool is_valid_register()
+    static constexpr bool is_valid_register(SubRegister = SubRegister{})
     {
         return SubRegistersTuple{}.fold_right(false, [](auto field, bool isValid) {
             return isValid || (std::is_same_v<typename SubRegister::This, typename decltype(field)::This>);
@@ -156,10 +156,8 @@ public:
         std::get<R>(registers) = reg;
     }
 
-
-    template<typename Register>
-    [[nodiscard]]
-    static constexpr bool is_valid_register()
+    template<typename SubRegister>
+    static constexpr bool is_valid_register([[maybe_unused]] SubRegister r = SubRegister{})
     {
         return RegistersTuple{}.fold_right(false, [](auto reg, bool isValid) {
             return isValid || reg.is_valid_register(reg);
@@ -174,8 +172,8 @@ public:
         });
     }
 
-    template<typename Register>
-    constexpr void write(Register reg)
+    template<typename SubRegister>
+    constexpr auto read([[maybe_unused]] SubRegister r = SubRegister{})
     {
         static_assert(is_valid_register<Register>());
         std::get<decltype(find_first(reg))>(registers).write(reg);
