@@ -25,7 +25,7 @@ struct can_preincrement
     };
 };
 
-struct can_postincrementable
+struct can_postincrement
 {
     template <typename Derived, typename ValueType>
     struct mixin
@@ -43,8 +43,8 @@ struct can_postincrementable
 struct can_increment {
     template<typename Derived, typename ValueType>
     struct mixin
-    :   pre_incrementable::template mixin<Derived, ValueType>,
-        post_incrementable::template mixin<Derived, ValueType>
+    :   can_preincrement::template mixin<Derived, ValueType>,
+        can_postincrement::template mixin<Derived, ValueType>
     {
     };
 };
