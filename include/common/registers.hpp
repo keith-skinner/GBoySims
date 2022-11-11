@@ -183,14 +183,14 @@ public:
     template<typename SubRegister>
     static constexpr std::size_t get_index([[maybe_unused]]SubRegister r = SubRegister{})
     {
-        static_assert(is_valid_register<SubRegister>());
+        static_assert(is_valid_register<SubRegister>(), "SubRegister not defined for this register file");
         return std::get<1>(RegisterDefTuple{}.fold_left(std::make_tuple(false, 0), [](auto accumulator, auto field) {
             if (std::get<0>(accumulator))
                 return accumulator; // already found so skip
             else if (decltype(field)::template is_valid_register<decltype(r)>())
-                return std::make_tuple(true, std::get<1>(accumulator)); // set found++
+                return std::make_tuple(true, std::get<1>(accumulator));
             else
-                return std::make_tuple(false, ++std::get<1>(accumulator)); // increment index
+                return std::make_tuple(false, ++std::get<1>(accumulator));
         }));
     }
 
