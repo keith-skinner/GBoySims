@@ -2,9 +2,13 @@
 #include <string_view>
 #include <optional>
 #include <array>
+#include <cstdint>
+
+namespace LR35902
+{
 
 struct Opcode {
-    const uint16_t code;
+    const std::uint16_t code;
     bool CB;
     const std::string_view name;
     const int length;
@@ -567,3 +571,5 @@ const std::array<Opcode, 256> cb_opcodes {{
     {0xFE, false, "SET 7, (HL)", 2, 16},
     {0xFF, false, "SET 7, A", 2, 8},
 }};
+
+} // namespace LR35902

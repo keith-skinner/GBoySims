@@ -5,10 +5,10 @@ target_sources(
     arguments.hpp
     endian.hpp
     registers.hpp
+    opcodes.hpp
 
     # cpu.hpp
     # micro.hpp
-    # opcodes.hpp
 )
 target_link_libraries(
     LR35902
