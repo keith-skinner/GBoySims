@@ -49,7 +49,7 @@ struct Register
 :   common::Arguments::Type::register_t<T>
 {
     static constexpr Name name = R;
-    using common::Arguments::Type::register_t<T>::Type;
+    using typename common::Arguments::Type::register_t<T>::Type;
 };
 
 // Immediate Data Types
