@@ -1,35 +1,36 @@
 #pragma once
 #include <string_view>
 #include <common/registers.hpp>
+#include <sc/string_constant.hpp>
 
 namespace LR35902::Definitions::Names
 {
 
-struct LR35902 { static constexpr std::string_view name = "LR35902"; };
+using LR35902 = decltype("LR35902"_sc);
 
 namespace Flags
 {
-struct Z { static constexpr std::string_view name = "Z"; };
-struct N { static constexpr std::string_view name = "N"; };
-struct H { static constexpr std::string_view name = "H"; };
-struct C { static constexpr std::string_view name = "C"; };
+using Z = decltype("Flags::Z"_sc);
+using N = decltype("Flags::N"_sc);
+using H = decltype("Flags::H"_sc);
+using C = decltype("Flags::C"_sc);
 }
 
-struct A { static constexpr std::string_view name = "A"; };
-struct F { static constexpr std::string_view name = "F"; };
-struct B { static constexpr std::string_view name = "B"; };
-struct C { static constexpr std::string_view name = "C"; };
-struct D { static constexpr std::string_view name = "D"; };
-struct E { static constexpr std::string_view name = "E"; };
-struct H { static constexpr std::string_view name = "H"; };
-struct L { static constexpr std::string_view name = "L"; };
+using A = decltype("A"_sc);
+using F = decltype("F"_sc);
+using B = decltype("B"_sc);
+using C = decltype("C"_sc);
+using D = decltype("D"_sc);
+using E = decltype("E"_sc);
+using H = decltype("H"_sc);
+using L = decltype("L"_sc);
 
-struct AF { static constexpr std::string_view name = "AF"; };
-struct BC { static constexpr std::string_view name = "BC"; };
-struct DE { static constexpr std::string_view name = "DE"; };
-struct HL { static constexpr std::string_view name = "HL"; };
-struct PC { static constexpr std::string_view name = "PC"; };
-struct SP { static constexpr std::string_view name = "SP"; };
+using AF = decltype("AF"_sc);
+using BC = decltype("BC"_sc);
+using DE = decltype("DE"_sc);
+using HL = decltype("HL"_sc);
+using PC = decltype("PC"_sc);
+using SP = decltype("SP"_sc);
 
 
 } // namespace LR35902::Definitions::Names
@@ -77,11 +78,11 @@ using RegisterDef = common::registerdef_t<Name, Repr, Width, SubRegisters...>;
 using AF = RegisterDef<Names::AF, uint16_t, 16, ::LR35902::AF, ::LR35902::A, ::LR35902::F, 
     ::LR35902::Flags::Z, ::LR35902::Flags::N, ::LR35902::Flags::H, ::LR35902::Flags::C>;
 using BC = RegisterDef<Names::BC, uint16_t, 16, ::LR35902::BC, ::LR35902::B, ::LR35902::C>;
-using DE = RegisterDef<Names::BC, uint16_t, 16, ::LR35902::BC, ::LR35902::B, ::LR35902::C>;
-using HL = RegisterDef<Names::BC, uint16_t, 16, ::LR35902::BC, ::LR35902::B, ::LR35902::C>;
+using DE = RegisterDef<Names::DE, uint16_t, 16, ::LR35902::DE, ::LR35902::D, ::LR35902::E>;
+using HL = RegisterDef<Names::HL, uint16_t, 16, ::LR35902::HL, ::LR35902::H, ::LR35902::L>;
 
-using PC = RegisterDef<Names::BC, uint16_t, 16, ::LR35902::BC>;
-using SP = RegisterDef<Names::BC, uint16_t, 16, ::LR35902::BC>;
+using PC = RegisterDef<Names::PC, uint16_t, 16, ::LR35902::PC>;
+using SP = RegisterDef<Names::SP, uint16_t, 16, ::LR35902::SP>;
 
 } // namespace LR35902::Defintions
 namespace LR35902
