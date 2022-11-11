@@ -19,12 +19,12 @@ struct memory_t {
     static constexpr Type offset{Offset};
 };
 
-template<typename T, typename Type = T::Type>
+template<typename T, typename Type = typename T::Type>
 static constexpr bool is_immediate_v = std::is_same_v<T, immediate_t<Type>>;
 template<typename T>
 concept a_immediate = is_immediate_v<T>;
 
-template<typename T, typename Type = T::Type, typename OffsetType=T::OffsetType, OffsetType Offset = T::value>
+template<typename T, typename Type = typename T::Type, typename OffsetType= typename T::OffsetType, OffsetType Offset = T::value>
 static constexpr bool is_reference_v = std::is_same_v<T, memory_t<Type, OffsetType, Offset>>;
 template<typename T>
 concept a_reference = is_reference_v<T>;
@@ -58,7 +58,7 @@ struct register_t
     const Type value{};
 };
 
-template<typename T, typename Type = T::Type>
+template<typename T, typename Type = typename T::Type>
 static constexpr bool is_register_v = std::is_same_v<T, register_t<Type>>;
 template<typename T>
 concept a_register = is_register_v<T>;   

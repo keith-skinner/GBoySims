@@ -4,6 +4,7 @@ add_executable(
     LR35902/endian.cpp
     LR35902/arguments.cpp
     LR35902/registers.cpp
+    LR35902/opcodes.cpp
 )
 target_compile_features(
     test_lr35902
@@ -16,11 +17,11 @@ target_compile_options(
     $<$<CONFIG:DEBUG>:-Wextra>
     $<$<CONFIG:DEBUG>:-Wpedantic>
     -Wno-unknown-pragmas
-    -fconcepts-diagnostics-depth=8
 )
 target_link_libraries(
     test_lr35902
     PRIVATE
     LR35902
     gtest_main
+    spdlog
 )
