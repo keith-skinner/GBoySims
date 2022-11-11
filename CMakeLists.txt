@@ -7,6 +7,12 @@ FetchContent_Declare(
     GIT_TAG         release-1.12.1
 )
 FetchContent_MakeAvailable(googletest)
+FetchContent_Declare(
+    spdlog
+    GIT_REPOSITORY  https://github.com/gabime/spdlog.git
+    GIT_TAG         v1.11.0
+)
+FetchContent_MakeAvailable(spdlog)
 
 
 project(GB)
@@ -27,7 +33,6 @@ target_compile_options(
     $<$<CONFIG:DEBUG>:-Wall>
     $<$<CONFIG:DEBUG>:-Wextra>
     $<$<CONFIG:DEBUG>:-Wpedantic>
-    -Wno-unknown-pragmas
 )
 target_sources(
     ${PROJECT_NAME}
@@ -37,8 +42,9 @@ target_sources(
 
 target_link_libraries(
     ${PROJECT_NAME}
-    PUBLIC
+    PRIVATE
     cib
     LR35902
+    spdlog
 )
 
