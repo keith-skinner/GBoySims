@@ -59,7 +59,7 @@ public:
     {
         // align value bits with bits to insert value into
         // zero out bits to insert value into and insert value into data
-        data = (static_cast<uint64_t>(value) << size) | (data & ~reg_mask);
+        data = (static_cast<uint64_t>(value) << lsb) | (data & ~reg_mask);
     }
 };
 
