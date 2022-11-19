@@ -1,7 +1,5 @@
 add_executable(
     test_lr35902
-    # Files ordered in order of logical conclusion
-    LR35902/endian.cpp
     LR35902/arguments.cpp
     LR35902/registers.cpp
     LR35902/opcodes.cpp

@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <type_traits>
 #include <cib/tuple.hpp>
+#include <algorithm>
 
 namespace common
 {
@@ -17,7 +18,7 @@ template <
 class register_t
 {
 private:
-    ReprT value;
+    ReprT m_value;
 public:
     using This = register_t<NameT, ReprT, MsbV, LsbV>;
     using Name = NameT;
@@ -31,14 +32,16 @@ public:
     static_assert(lsb <= msb, "Msb needs to be lower than or equal to Lsb");
     static_assert(width <= repr_width, "Msb must fit within the size of the representation");
 
-    constexpr register_t(Repr const & value) : value{value} {}
-    constexpr register_t() : value{} {}
+    constexpr register_t(Repr const & value) : m_value{value} {}
+    constexpr register_t() : m_value{} {}
 
     static constexpr uint64_t bit_mask = [](){
         if constexpr (width == 64)
             return 0xFFFFFFFFFFFFFFFF;
         else
             // Move 1 to bit size, make bit size 0 and all other lower bits 1
+            // E.g. Msb=7 & Lsb=4 -> width=4; shift 1 by 4; 0b10000; -1; 0b01111;
+            // E.g. Msb=0 & Lsb=0 -> width=1; shift 1 by 1; 0b00010; -1; 0b00001;
             return (static_cast<uint64_t>(1) << static_cast<uint64_t>(width)) - static_cast<uint64_t>(1);
     }();
     static constexpr uint64_t reg_mask = bit_mask << lsb;
@@ -49,36 +52,36 @@ public:
     [[nodiscard]]
     static constexpr Repr read(DataStore const & data)
     {
-        return static_cast<Repr>(
-            (data >> lsb) // get relevent data to the lsb of data;
-            & bit_mask // remove data that is not relevant
-        );
+        return (data & reg_mask) >> lsb;
     }
 
     //insert
-    template <typename DataStore>
+    template <std::unsigned_integral DataStore>
     constexpr void write(DataStore & data)
     {
         // align value bits with bits to insert value into
         // zero out bits to insert value into and insert value into data
-        data = (static_cast<uint64_t>(value) << lsb) | (data & ~reg_mask);
+        data = (static_cast<uint64_t>(m_value) << lsb) | (data & ~reg_mask);
     }
+
+    constexpr ReprT & value() { return m_value; }
+    constexpr ReprT value() const { return m_value; }
 };
 
 
 /**
  * @brief Register value that describes a Register and its SubRegisters
  * @note  A flag can be described as a subregister with the width of 1 bit
- * 
- * @tparam Name 
- * @tparam Repr What representation a register should be 
+ *
+ * @tparam Name
+ * @tparam Repr What representation a register should be
  * @tparam Width Max number of bits representable in the register
  * @tparam SubRegisters All addressable registers of this register including the name of the register itself
  */
 template <
-    typename NameT, 
-    typename ReprT, 
-    std::size_t WidthV, 
+    typename NameT,
+    typename ReprT,
+    std::size_t WidthV,
     typename ... SubRegisters>
 class registerdef_t
 {
@@ -92,7 +95,7 @@ public:
     static constexpr Name name{};
     static constexpr std::size_t repr_width = sizeof(Repr) * 8;
     static constexpr std::size_t width = WidthV;
-    
+
 
     static_assert(width > 0, "Register must have a Width of at least 1");
     static_assert(width <= repr_width, "Repr must be able to contain width");
@@ -209,6 +212,18 @@ public:
             "Must be reading from a registered subregister");
         return std::get<( get_index<SubRegister>() )>(registers).template read<SubRegister>();
     }
+
+    template<typename ... FlagRegisters>
+    constexpr void flags(FlagRegisters ... rflags)
+    {
+        // do nothing if empty
+        if constexpr (sizeof...(FlagRegisters) == 0)
+            return;
+        static_assert((true && ... && is_valid_register<FlagRegisters>()),
+            "FlagRegisters must be registered to this register file");
+        (write(rflags), ...);
+    }
 };
 
-}
+
+} // namespace common

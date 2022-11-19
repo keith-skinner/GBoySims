@@ -3,9 +3,9 @@ target_sources(
     LR35902
     INTERFACE
     arguments.hpp
-    endian.hpp
     registers.hpp
     opcodes.hpp
+    to_register.hpp
 
     # cpu.hpp
     # micro.hpp

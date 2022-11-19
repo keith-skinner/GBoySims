@@ -22,30 +22,33 @@ TEST(LR35902_registers, RegisterDef)
     EXPECT_FALSE( (std::is_same_v<LR35902::F, LR35902::B>) );
     EXPECT_FALSE( (std::is_same_v<LR35902::AF, LR35902::B>) );
     EXPECT_FALSE( af.is_valid_register<LR35902::B>() );
-    // af.write(LR35902::B{4}); // compile error
+    // af.write(LR35902::B{4}); // compile error expected because B isn't a registered subregister of AF 
+    // AF includes only subregisters AF, A, F, and the ZNHC flags b/c b
 
 
     af.write(LR35902::A{5});
-    EXPECT_EQ(0x05, af.read<LR35902::A>());
-    EXPECT_EQ(0x00, af.read<LR35902::F>());
-    EXPECT_EQ(0x0500, af.read<LR35902::AF>()); // A is higher byte
+    EXPECT_EQ(0x05, af.read<LR35902::A>()); // A is writable
+    EXPECT_EQ(0x00, af.read<LR35902::F>()); // F is distinct from A
+    EXPECT_EQ(0x0500, af.read<LR35902::AF>()); // A is higher byte of AF
 
     af.write(LR35902::F{0b1111'0000});
-    EXPECT_EQ(0x05, af.read<LR35902::A>());
-    EXPECT_EQ(0xF0, af.read<LR35902::F>());
-    EXPECT_EQ(0x05F0, af.read<LR35902::AF>()); // F is lower byte
+    EXPECT_EQ(0x05, af.read<LR35902::A>()); // A is distinct from F
+    EXPECT_EQ(0xF0, af.read<LR35902::F>()); // F is writable
+    EXPECT_EQ(0x05F0, af.read<LR35902::AF>()); // F is lower byte of AF
 
-    EXPECT_EQ(true, af.read<LR35902::Flags::Z>()); // Z is bit 7
-    EXPECT_EQ(true, af.read<LR35902::Flags::N>()); // N is bit 6
-    EXPECT_EQ(true, af.read<LR35902::Flags::H>()); // H is bit 5
-    EXPECT_EQ(true, af.read<LR35902::Flags::C>()); // C is bit 4
+    EXPECT_EQ(true, af.read<LR35902::Flags::Z>()); // Z is bit 7 of AF
+    EXPECT_EQ(true, af.read<LR35902::Flags::N>()); // N is bit 6 of AF
+    EXPECT_EQ(true, af.read<LR35902::Flags::H>()); // H is bit 5 of AF
+    EXPECT_EQ(true, af.read<LR35902::Flags::C>()); // C is bit 4 of AF
 
     // the flags are individually accessible and affect the F register
     af.write(LR35902::Flags::Z{false});
+    af.write(LR35902::Flags::N{true} );
     af.write(LR35902::Flags::H{false});
-    EXPECT_EQ(0x05, af.read<LR35902::A>());
-    EXPECT_EQ(0b0101'0000, af.read<LR35902::F>());
-    EXPECT_EQ(0x0500 + 0b0101'0000, af.read<LR35902::AF>());
+    af.write(LR35902::Flags::C{true} );
+    EXPECT_EQ(0x05, af.read<LR35902::A>()); // A is distinct from flags
+    EXPECT_EQ(0b0101'0000, af.read<LR35902::F>()); // F is not distinct from flags
+    EXPECT_EQ(0x0500 + 0b0101'0000, af.read<LR35902::AF>()); // AF is not distinct from flags
     EXPECT_EQ(false, af.read<LR35902::Flags::Z>()); // Z is bit 7
     EXPECT_EQ(true,  af.read<LR35902::Flags::N>()); // N is bit 6
     EXPECT_EQ(false, af.read<LR35902::Flags::H>()); // H is bit 5
@@ -85,16 +88,19 @@ TEST(LR35902_registers, RegisterFile)
     EXPECT_EQ(0, rf.read<LR35902::Flags::H>());
     EXPECT_EQ(0, rf.read<LR35902::Flags::C>());
 
+    // A is higher byte
     rf.write(LR35902::A{5});
     EXPECT_EQ(0x05, rf.read<LR35902::A>());
     EXPECT_EQ(0x00, rf.read<LR35902::F>());
-    EXPECT_EQ(0x0500, rf.read<LR35902::AF>()); // A is higher byte
+    EXPECT_EQ(0x0500, rf.read<LR35902::AF>());
 
+    // F is lower byte
     rf.write(LR35902::F{0b1111'0000});
     EXPECT_EQ(0x05, rf.read<LR35902::A>());
     EXPECT_EQ(0xF0, rf.read<LR35902::F>());
-    EXPECT_EQ(0x05F0, rf.read<LR35902::AF>()); // F is lower byte
+    EXPECT_EQ(0x05F0, rf.read<LR35902::AF>());
 
+    // Check single bit flags
     EXPECT_EQ(true, rf.read<LR35902::Flags::Z>()); // Z is bit 7
     EXPECT_EQ(true, rf.read<LR35902::Flags::N>()); // N is bit 6
     EXPECT_EQ(true, rf.read<LR35902::Flags::H>()); // H is bit 5
@@ -111,4 +117,22 @@ TEST(LR35902_registers, RegisterFile)
     EXPECT_EQ(false, rf.read<LR35902::Flags::H>()); // H is bit 5
     EXPECT_EQ(true,  rf.read<LR35902::Flags::C>()); // C is bit 4
 
+
+    // Need a new registerfile type with missing registers to check
+    // that the registration works
+
+    // write 1 flag
+    rf.flags(LR35902::Flags::Z{true});
+    EXPECT_EQ(true, rf.read<LR35902::Flags::Z>());
+
+    // write multiple flags
+    rf.flags(
+        LR35902::Flags::Z{false}, 
+        LR35902::Flags::N{false}, 
+        LR35902::Flags::H{false}, 
+        LR35902::Flags::C{false});
+    EXPECT_EQ(false, rf.read<LR35902::Flags::Z>());
+    EXPECT_EQ(false, rf.read<LR35902::Flags::N>());
+    EXPECT_EQ(false, rf.read<LR35902::Flags::H>());
+    EXPECT_EQ(false, rf.read<LR35902::Flags::C>());
 }

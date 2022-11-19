@@ -5,32 +5,29 @@ namespace common::Arguments::Access
 {
 
 
-template<typename T>
+template<typename OffsetT>
 struct immediate_t{
-    using Type = T;
-    static constexpr Type offset{0};
+    using offset_t = OffsetT;
+    static constexpr offset_t offset{0};
 };
 
-template<typename T, std::unsigned_integral I, I Offset>
-struct memory_t {
-    using Type = T;
-    using OffsetType = I;
-    static constexpr OffsetType value = Offset;
-    static constexpr Type offset{Offset};
+template<typename OffsetT, std::unsigned_integral IOffsetT, IOffsetT OffsetV>
+struct reference_t {
+    using offset_t = OffsetT;
+    using constant_t = IOffsetT;
+    static constexpr constant_t constant_value = OffsetV;
+    static constexpr offset_t offset{OffsetV};
 };
 
-template<typename T, typename Type = typename T::Type>
-static constexpr bool is_immediate_v = std::is_same_v<T, immediate_t<Type>>;
+template<typename T, typename offset_t = typename T::offset_t>
+static constexpr bool is_immediate_v = std::is_same_v<T, immediate_t<offset_t>>;
 template<typename T>
 concept a_immediate = is_immediate_v<T>;
 
-template<typename T, typename Type = typename T::Type, typename OffsetType= typename T::OffsetType, OffsetType Offset = T::value>
-static constexpr bool is_reference_v = std::is_same_v<T, memory_t<Type, OffsetType, Offset>>;
+template<typename T, typename offset_t = typename T::offset_t, typename constant_t = typename T::constant_t, constant_t constant_value = T::constant_value>
+static constexpr bool is_reference_v = std::is_same_v<T, reference_t<offset_t, constant_t, constant_value>>;
 template<typename T>
 concept a_reference = is_reference_v<T>;
-
-template<typename T>
-concept a_arg_access = a_immediate<T> || a_reference<T>;
 
 
 } // namespace Arguments::Access
@@ -44,12 +41,6 @@ struct immediate_t
     const Type value{};
 };
 
-template<typename T, std::integral Type = typename T::Type>
-static constexpr bool is_immediate_v = std::is_same_v<T, immediate_t<Type>>;
-template<typename T>
-concept a_immediate = is_immediate_v<T>;
-
-
 template<std::unsigned_integral T>
 struct register_t
 {
@@ -58,10 +49,15 @@ struct register_t
     const Type value{};
 };
 
+template<typename T, std::integral Type = typename T::Type>
+static constexpr bool is_immediate_v = std::is_same_v<T, immediate_t<Type>>;
+template<typename T>
+concept a_immediate = is_immediate_v<T>;
+
 template<typename T, typename Type = typename T::Type>
 static constexpr bool is_register_v = std::is_same_v<T, register_t<Type>>;
 template<typename T>
-concept a_register = is_register_v<T>;   
+concept a_register = is_register_v<T>;
 
 
 } // namespace Arguments::Type
@@ -69,11 +65,11 @@ namespace common::Arguments
 {
 
 template<
-    typename T,
-    typename A>
+    typename TypeT,
+    typename AccessT>
 struct argument_t {
-    using Type = T;
-    using Access = A;
+    using Type = TypeT;
+    using Access = AccessT;
 
     constexpr argument_t() = default;
     constexpr argument_t(const size_t value)
