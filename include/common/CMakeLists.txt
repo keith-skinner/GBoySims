@@ -4,6 +4,7 @@ target_sources(
     INTERFACE
     arguments.hpp
     registers.hpp
+    memory.hpp
     
 )
 target_include_directories(

@@ -6,9 +6,7 @@ target_sources(
     registers.hpp
     opcodes.hpp
     to_register.hpp
-
-    # cpu.hpp
-    # micro.hpp
+    mmu.hpp
 )
 target_link_libraries(
     LR35902

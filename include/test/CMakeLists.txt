@@ -3,6 +3,7 @@ add_executable(
     LR35902/arguments.cpp
     LR35902/registers.cpp
     LR35902/opcodes.cpp
+    LR35902/micro.cpp
 )
 target_compile_features(
     test_lr35902

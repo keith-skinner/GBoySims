@@ -2,23 +2,21 @@
 #include <memory>
 #include <type_traits>
 #include <concepts>
+
 #include <sc/string_constant.hpp>
+
+#include <common/memory.hpp>
 
 #include "arguments.hpp"
 #include "registers.hpp"
 #include "to_register.hpp"
+#include "mmu.hpp"
 
 namespace LR35902
 {
 
-struct MMUComponent
-{
-    uint8_t (&read)(uint16_t addr);
-    void (&write)(uint16_t addr, uint8_t value);
-};
-
 template<typename T>
-constexpr bool is_flag_v = 
+constexpr bool is_flag_v =
        std::is_same_v<T, LR35902::Flags::Z>
     || std::is_same_v<T, LR35902::Flags::N>
     || std::is_same_v<T, LR35902::Flags::H>
@@ -55,10 +53,12 @@ public:
     enum class Jump { Z, NZ, C, NC, None };
 private:
     RegisterFile regs;
-    [[maybe_unused]] //TODO remove me
-    MMUComponent mmu;
+    MMU mmu;
+public:
 
-    Micro(RegisterFile& regs, MMUComponent& mmu) : regs{regs}, mmu{mmu} {}
+    Micro(RegisterFile regs, MMU mmu)
+    : regs{regs}, mmu{mmu}
+    {}
 
     constexpr bool NOP()
     {
@@ -110,22 +110,23 @@ private:
     // }
 #pragma endregion // LD
 
-//     constexpr bool INC(const Args::Reg16 auto r)
-//     {
-//         write(r, read(r) + OFFSET);
-//         regs.flags('-', '-', '-', '-');
-//         return true;
-//     }
-//     constexpr bool INC(const Args::StdArg auto r)
-//     {
-//         const auto new_value = read(r) + OFFSET;
-//         write(r, new_value);
-//         const bool Z = new_value == 0;
-//         const bool H = half_carry(new_value, +OFFSET);
-//         regs.flags(Z, 0, H, '-');
-//         return true;
-//     }
-    
+    // constexpr bool INC(const Args::Reg16 auto r)
+    // {
+    //     write(r, read(r) + OFFSET);
+    //     regs.flags('-', '-', '-', '-');
+    //     return true;
+    // }
+
+    // constexpr bool INC(const Args::StdArg auto r)
+    // {
+    //     const auto new_value = read(r) + OFFSET;
+    //     write(r, new_value);
+    //     const bool Z = new_value == 0;
+    //     const bool H = half_carry(new_value, +OFFSET);
+    //     regs.flags(Z, 0, H, '-');
+    //     return true;
+    // }
+
 //     constexpr bool DEC(const Args::Reg16 auto r)
 //     {
 //         write(r, read(r) - OFFSET);
@@ -142,7 +143,7 @@ private:
 //         regs.flags(Z, 1, H, '-');
 //         return true;
 //     }
-    
+
 //     constexpr bool ADD(const Args::HL a, const Args::Reg16 auto b)
 //     {
 //         const auto av = read(a);
@@ -179,7 +180,7 @@ private:
 //         regs.flags(0, 0, H, C);
 //         return true;
 //     }
-    
+
 //     constexpr bool ADC(const Args::A a, const Args::StdArgImm auto b)
 //     {
 //         const uint8_t av = read(a);
@@ -192,7 +193,7 @@ private:
 //         regs.flags(Z, 0, H, C);
 //         return true;
 //     }
-    
+
 //     constexpr bool SUB(const Args::A a, const Args::StdArgImm auto b)
 //     {
 //         const uint8_t av = read(a);
@@ -205,7 +206,7 @@ private:
 //         regs.flags(Z, 1, H, C);
 //         return true;
 //     }
-    
+
 //     constexpr bool SBC(const Args::A a, const Args::StdArgImm auto b)
 //     {
 //         const uint8_t av = read(a);
@@ -218,7 +219,7 @@ private:
 //         regs.flags(Z, 1, H, C);
 //         return true;
 //     }
-    
+
 //     constexpr bool AND(const Args::A a, const Args::StdArgImm auto b)
 //     {
 //         const uint8_t av = read(a);
@@ -229,7 +230,7 @@ private:
 //         regs.flags(Z, 0, 1, 0);
 //         return true;
 //     }
-    
+
 //     constexpr bool XOR(const Args::A a, const Args::StdArgImm auto b)
 //     {
 //         const uint8_t av = read(a);
@@ -240,7 +241,7 @@ private:
 //         regs.flags(Z, 0, 0, 0);
 //         return true;
 //     }
-    
+
 //     constexpr bool OR(const Args::A a, const Args::StdArgImm auto b)
 //     {
 //         const uint8_t av = read(a);
@@ -251,7 +252,7 @@ private:
 //         regs.flags(Z, 0, 0, 0);
 //         return true;
 //     }
-    
+
 //     constexpr bool CP(const Args::A a, const Args::StdArgImm auto b)
 //     {
 //         const uint8_t av = read(a);
@@ -271,7 +272,7 @@ private:
 //         regs.flags('-', '-', '-', '-');
 //         return true;
 //     }
-    
+
 //     constexpr bool POP(const Args::Reg16 auto dst)
 //     {
 //         write(dst, pop());
@@ -294,7 +295,7 @@ private:
 //         }
 //         return success;
 //     }
-    
+
 //     constexpr bool CALL(const Args::A16 addr, Jump cond)
 //     {
 //         bool success = jump(cond);
@@ -315,7 +316,7 @@ private:
 //         regs.flags('-', '-', '-', '-');
 //         return success;
 //     }
-    
+
 //     constexpr bool JP(const Args::A16 addr, Jump cond)
 //     {
 //         bool success = jump(cond);
@@ -325,7 +326,7 @@ private:
 //         regs.flags('-', '-', '-', '-');
 //         return success;
 //     }
-   
+
 //     constexpr bool JP(const Args::HL hl)
 //     {
 //         write(Args::PC{}, read(hl));
@@ -337,30 +338,30 @@ private:
 //     {
 //         return true;
 //     }
-    
+
 //     constexpr bool HALT()
 //     {
 //         return true;
 //     }
-    
+
 //     constexpr bool RETI()
 //     {
 //         regs.flags('-', '-', '-', '-');
 //         return true;
 //     }
-    
+
 //     constexpr bool DI()
 //     {
 //         regs.flags('-', '-', '-', '-');
 //         return true;
 //     }
-    
+
 //     constexpr bool EI()
 //     {
 //         regs.flags('-', '-', '-', '-');
 //         return true;
 //     }
-    
+
 //     constexpr bool DAA()
 //     {
 //         return true;
@@ -378,7 +379,7 @@ private:
 //         regs.flags(Z, 0, 0, C);
 //         return true;
 //     }
-    
+
 //     constexpr bool RRC(const Args::StdArg auto arg)
 //     {
 //         const auto v = read(arg);
@@ -391,7 +392,7 @@ private:
 //         regs.flags(Z, 0, 0, C);
 //         return true;
 //     }
-   
+
 //     constexpr bool RL(const Args::StdArg auto arg)
 //     {
 //         const auto v = read(arg);
@@ -405,7 +406,7 @@ private:
 //         regs.flags(Z, 0, 0, C);
 //         return true;
 //     }
-    
+
 //     constexpr bool RR(const Args::StdArg auto arg)
 //     {
 //         const auto v = read(arg);
@@ -419,7 +420,7 @@ private:
 //         regs.flags(Z, 0, 0, C);
 //         return true;
 //     }
-    
+
 //     constexpr bool SLA(const Args::StdArg auto arg)
 //     {
 //         const auto v = read(arg);
@@ -432,7 +433,7 @@ private:
 //         regs.flags(Z, 0, 0, C);
 //         return true;
 //     }
-    
+
 //     constexpr bool SRA(const Args::StdArg auto arg)
 //     {
 //         const auto v = read(arg);
@@ -446,7 +447,7 @@ private:
 //         regs.flags(Z, 0, 0, C);
 //         return true;
 //     }
-    
+
 //     constexpr bool SWAP(const Args::StdArg auto arg)
 //     {
 //         const uint8_t v = read(arg);
@@ -456,7 +457,7 @@ private:
 //         regs.flags(Z, 0, 0, 0);
 //         return true;
 //     }
-    
+
 //     constexpr bool SRL(const Args::StdArg auto arg)
 //     {
 //         const uint8_t v = read(arg);
@@ -469,7 +470,7 @@ private:
 //         regs.flags(Z, 0, 0, C);
 //         return true;
 //     }
-    
+
 //     constexpr bool BIT(int n, const Args::StdArg auto arg)
 //     {
 //         const uint8_t v = read(arg);
@@ -477,7 +478,7 @@ private:
 //         regs.flags(Z, 0, 1, '-');
 //         return true;
 //     }
-    
+
 //     constexpr bool RES(int n, const Args::StdArg auto arg)
 //     {
 //         const uint8_t v = read(arg);
@@ -486,7 +487,7 @@ private:
 //         regs.flags('-', '-', '-', '-');
 //         return true;
 //     }
-    
+
 //     constexpr bool SET(int n, const Args::StdArg auto arg)
 //     {
 //         const uint8_t v = read(arg);
@@ -502,13 +503,13 @@ private:
 //         regs.flags('-', 0, 0, C);
 //         return true;
 //     }
-    
+
 //     constexpr bool SCF()
 //     {
 //         regs.flags('-', 0, 0, 1);
 //         return true;
 //     }
-    
+
 //     constexpr bool CPL()
 //     {
 //         const uint8_t v = read(Args::A{});
@@ -522,13 +523,13 @@ private:
 //         const uint8_t v = read(Args::A{});
 //         const uint8_t b7 = bit(7, v, 0);
 //         const uint8_t shift = (v << 1);
-//         const uint8_t r = (shift & 0b1111'1110) | b7; 
+//         const uint8_t r = (shift & 0b1111'1110) | b7;
 //         write(Args::A{}, r);
 //         const bool C = b7;
 //         regs.flags(0, 0, 0, C);
 //         return true;
 //     }
-    
+
 //     constexpr bool RRCA()
 //     {
 //         const uint8_t v = read(Args::A{});
@@ -540,7 +541,7 @@ private:
 //         regs.flags(0, 0, 0, C);
 //         return true;
 //     }
-    
+
 //     constexpr bool RLA()
 //     {
 //         const auto v = read(Args::A{});
@@ -553,7 +554,7 @@ private:
 //         regs.flags(0, 0, 0, C);
 //         return true;
 //     }
-    
+
 //     constexpr bool RRA()
 //     {
 //         const uint8_t v = read(Args::A{});
@@ -581,7 +582,7 @@ private:
 //         push(static_cast<const uint8_t*>(static_cast<const void *>(&le_value))[1]);
 //         push(static_cast<const uint8_t*>(static_cast<const void *>(&le_value))[0]);
 //     }
-    
+
 //     constexpr uint8_t pop8()
 //     {
 //         data_t value = read(Args::rSP{});
@@ -609,7 +610,7 @@ private:
 //         }
 //         return false;
 //     }
-    
+
 //     constexpr uint8_t bit(int loc, uint8_t value, int end = 0)
 //     {
 //         return ((value & (1 << loc)) >> loc) << end;
@@ -663,7 +664,7 @@ private:
         static_assert(str[1] == '-' || str[1] == '0' || str[1] == '1' || str[1] == 'N', "Invalid flag value: str[1]");
         static_assert(str[2] == '-' || str[2] == '0' || str[2] == '1' || str[2] == 'H', "Invalid flag value: str[2]");
         static_assert(str[3] == '-' || str[3] == '0' || str[3] == '1' || str[3] == 'C', "Invalid flag value: str[3]");
-        
+
         // don't touch flags
         if constexpr (str == "----"_sc)
             return;
@@ -679,15 +680,15 @@ private:
         constexpr bool cset = str[3] == 'C';
 
         constexpr bool z = zset && F1;
-        constexpr bool n = nset && 
-                      ((zset && F2) 
+        constexpr bool n = nset &&
+                      ((zset && F2)
                     || F1);
-        constexpr bool h = hset && 
-                      (( zset &&  nset && F3) 
-                    || (!zset &&  nset && F2) 
-                    || ( zset && !nset && F2) 
+        constexpr bool h = hset &&
+                      (( zset &&  nset && F3)
+                    || (!zset &&  nset && F2)
+                    || ( zset && !nset && F2)
                     || F1);
-        constexpr bool c = cset && 
+        constexpr bool c = cset &&
                       (( zset &&  nset &&  hset && F4)
                     || (!zset &&  nset &&  hset && F3)
                     || ( zset && !nset &&  hset && F3)
@@ -702,13 +703,13 @@ private:
             &[](const auto str){ if constexpr (str[1] == '-') return n_reg_mask_t{}; else return LR35902::Flags::N::reg_mask; }(str)
             &[](const auto str){ if constexpr (str[2] == '-') return h_reg_mask_t{}; else return LR35902::Flags::H::reg_mask; }(str)
             &[](const auto str){ if constexpr (str[3] == '-') return c_reg_mask_t{}; else return LR35902::Flags::C::reg_mask; }(str);
-        
+
         constexpr auto set_mask =
              [](const auto str){ if constexpr (str[0] == '1') return LR35902::Flags::Z::reg_mask; else return z_reg_mask_t{}; }(str)
             &[](const auto str){ if constexpr (str[1] == '1') return LR35902::Flags::N::reg_mask; else return n_reg_mask_t{}; }(str)
             &[](const auto str){ if constexpr (str[2] == '1') return LR35902::Flags::H::reg_mask; else return h_reg_mask_t{}; }(str)
             &[](const auto str){ if constexpr (str[3] == '1') return LR35902::Flags::C::reg_mask; else return c_reg_mask_t{}; }(str);
-        
+
         auto eval_mask =
              [=](){ if constexpr (z) return LR35902::Flags::Z::reg_mask; else return z_reg_mask_t{}; }()
             &[=](){ if constexpr (n) return LR35902::Flags::N::reg_mask; else return n_reg_mask_t{}; }()
