@@ -97,41 +97,41 @@ using Argument = common::Arguments::argument_t<T, A>;
 
 //LR35902 Specific
 // 8-bit register arguments
-struct A  : public Argument<Type::A, Access::Immediate>  {};
-struct B  : public Argument<Type::B, Access::Immediate>  {};
-struct C  : public Argument<Type::C, Access::Immediate>  {};
-struct D  : public Argument<Type::D, Access::Immediate>  {};
-struct E  : public Argument<Type::E, Access::Immediate>  {};
-struct H  : public Argument<Type::H, Access::Immediate>  {};
-struct L  : public Argument<Type::L, Access::Immediate>  {};
+using A = Argument<Type::A, Access::Immediate>;
+using B = Argument<Type::B, Access::Immediate>;
+using C = Argument<Type::C, Access::Immediate>;
+using D = Argument<Type::D, Access::Immediate>;
+using E = Argument<Type::E, Access::Immediate>;
+using H = Argument<Type::H, Access::Immediate>;
+using L = Argument<Type::L, Access::Immediate>;
 
 // 16-bit register arguments
-struct AF  : public Argument<Type::AF, Access::Immediate> {};
-struct BC  : public Argument<Type::BC, Access::Immediate> {};
-struct DE  : public Argument<Type::DE, Access::Immediate> {};
-struct HL  : public Argument<Type::HL, Access::Immediate> {};
-struct SP  : public Argument<Type::SP, Access::Immediate> {};
-struct PC  : public Argument<Type::PC, Access::Immediate> {};
+using AF = Argument<Type::AF, Access::Immediate>;
+using BC = Argument<Type::BC, Access::Immediate>;
+using DE = Argument<Type::DE, Access::Immediate>;
+using HL = Argument<Type::HL, Access::Immediate>;
+using SP = Argument<Type::SP, Access::Immediate>;
+using PC = Argument<Type::PC, Access::Immediate>;
 
 // 8-bit register references
-struct zC : public Argument<Type::C, Access::zReference> {};
+using zC = Argument<Type::C, Access::zReference>;
 
 // 16-bit register references
-struct rBC : public Argument<Type::BC, Access::Reference> {};
-struct rDE : public Argument<Type::DE, Access::Reference> {};
-struct rHL : public Argument<Type::HL, Access::Reference> {};
-struct rPC : public Argument<Type::PC, Access::Reference> {};
-struct rSP : public Argument<Type::SP, Access::Reference> {};
+using rBC = Argument<Type::BC, Access::Reference>;
+using rDE = Argument<Type::DE, Access::Reference>;
+using rHL = Argument<Type::HL, Access::Reference>;
+using rPC = Argument<Type::PC, Access::Reference>;
+using rSP = Argument<Type::SP, Access::Reference>;
 
 // immediate arguments
-struct S8   : public Argument<Type::S8 , Access::Immediate>  {};
-struct D8   : public Argument<Type::D8 , Access::Immediate>  {};
-struct A16  : public Argument<Type::A16, Access::Immediate>  {};
-struct D16  : public Argument<Type::D16, Access::Immediate>  {};
+using S8  = Argument<Type::S8 , Access::Immediate>;
+using D8  = Argument<Type::D8 , Access::Immediate>;
+using A16 = Argument<Type::A16, Access::Immediate>;
+using D16 = Argument<Type::D16, Access::Immediate>;
 
 // immediate reference arguments
-struct zA8  : public Argument<Type::A8 , Access::zReference> {};
-struct rA16 : public Argument<Type::A16, Access::Reference>  {};
+using zA8  = Argument<Type::A8 , Access::zReference>;
+using rA16 = Argument<Type::A16, Access::Reference> ;
 
 
 } // namespce LR35902::Args
