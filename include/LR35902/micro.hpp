@@ -645,7 +645,8 @@ public:
     template<Type::a_register Type, Access::a_immediate Access>
     constexpr void write(const Args::Argument<Type, Access> reg, const typename Type::Type value)
     {
-        regs.write(reg, value);
+        using arg_t = decltype(reg);
+        regs.write(to_register_t<arg_t>{value});
     }
 
     // Write value to Memory
