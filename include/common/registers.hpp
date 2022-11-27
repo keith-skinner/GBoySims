@@ -32,8 +32,12 @@ public:
     static_assert(lsb <= msb, "Msb needs to be lower than or equal to Lsb");
     static_assert(width <= repr_width, "Msb must fit within the size of the representation");
 
-    constexpr register_t(Repr const & value) : m_value{value} {}
-    constexpr register_t() : m_value{} {}
+    constexpr register_t(Repr const & value) noexcept : m_value{value} {}
+    constexpr register_t() noexcept = default;
+    constexpr register_t(const register_t& other) noexcept : m_value{other.m_value} {}
+    constexpr register_t(register_t&& other) noexcept : m_value{std::move(other.m_value)} {}
+    constexpr register_t& operator=(const register_t&) noexcept = default;
+    constexpr register_t& operator=(register_t&&) noexcept  = default;
 
     static constexpr uint64_t bit_mask = [](){
         if constexpr (width == 64)
