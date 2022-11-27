@@ -47,16 +47,17 @@ constexpr bool is_src_v = a_member_of<T,
 template<typename T>
 concept a_src = is_src_v<T>;
 
+template<typename Registers, typename Memory>
 class Micro
 {
 public:
     enum class Jump { Z, NZ, C, NC, None };
 private:
-    RegisterFile regs;
-    MMU mmu;
+    Registers& regs;
+    Memory& mmu;
 public:
 
-    Micro(RegisterFile regs, MMU mmu)
+    Micro(Registers& regs, Memory& mmu)
     : regs{regs}, mmu{mmu}
     {}
 
@@ -716,11 +717,12 @@ public:
             &[=](){ if constexpr (h) return LR35902::Flags::H::reg_mask; else return h_reg_mask_t{}; }()
             &[=](){ if constexpr (c) return LR35902::Flags::C::reg_mask; else return c_reg_mask_t{}; }();
 
-        auto result = LR35902::F{ regs.read<LR35902::F>() };
+        auto f = regs. template read<LR35902::F>();
+        auto result = LR35902::F{f};
         result.value() &= ~change_mask; // remove information off all bits to be changed
         result.value() |= set_mask;     // add all ones information; implicitly adds all 0 information
         result.value() |= eval_mask;    // adds all evaluated information; implicitly adds all evaluated falses
-        regs.write<LR35902::F>(result);
+        regs. template write<LR35902::F>(result);
     }
 };
 
