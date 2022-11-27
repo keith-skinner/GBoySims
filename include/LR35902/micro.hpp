@@ -637,7 +637,7 @@ public:
     template<Type::a_arg_type Type, Access::a_reference Access>
     constexpr uint8_t read(const Args::Argument<Type, Access> arg)
     {
-        const auto addr = read(Args::Argument<Type, typename Access::Immediate>{arg.value()}) + Access::offset;
+        const auto addr = read(Args::Argument<Type, typename LR35902::Access::Immediate>{arg.value()}) + Access::offset;
         return mmu.read(addr);
     }
 
