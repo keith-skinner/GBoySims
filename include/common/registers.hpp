@@ -34,8 +34,8 @@ public:
 
     constexpr register_t(Repr const & value) noexcept : m_value{value} {}
     constexpr register_t() noexcept = default;
-    constexpr register_t(const register_t& other) noexcept : m_value{other.m_value} {}
-    constexpr register_t(register_t&& other) noexcept : m_value{std::move(other.m_value)} {}
+    constexpr register_t(const register_t& other) noexcept = default;
+    constexpr register_t(register_t&& other) noexcept = default;
     constexpr register_t& operator=(const register_t&) noexcept = default;
     constexpr register_t& operator=(register_t&&) noexcept  = default;
 
