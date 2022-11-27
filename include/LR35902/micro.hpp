@@ -619,23 +619,23 @@ public:
 
     // Read from Register Immediately
     template<Type::a_register Type, LR35902::Access::a_immediate Access>
-    constexpr auto read(const Args::Argument<Type, Access> arg) -> typename Type::Type
+    constexpr auto read(const Args::Argument<Type, Access> arg) const -> typename Type::Type
     {
         using arg_t = decltype(arg);
         using reg_t = to_register_t<arg_t>;
-        return regs.read<reg_t>();
+        return regs. template read<reg_t>();
     }
 
     // Read from Immidiate Immediately
     template<Type::a_immediate Type, Access::a_immediate Access>
-    constexpr auto read(const Args::Argument<Type, Access> imm) -> typename Type::Type
+    constexpr auto read(const Args::Argument<Type, Access> imm) const -> typename Type::Type
     {
         return imm.type.value;
     }
 
     // Read Address Referenced by T
     template<Type::a_arg_type Type, Access::a_reference Access>
-    constexpr uint8_t read(const Args::Argument<Type, Access> arg)
+    constexpr uint8_t read(const Args::Argument<Type, Access> arg) const
     {
         const auto addr = read(Args::Argument<Type, typename LR35902::Access::Immediate>{arg.value()}) + Access::offset;
         return mmu.read(addr);
