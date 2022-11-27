@@ -31,13 +31,13 @@ namespace LR35902::Type
 {
 
 
-template<typename T>
-using Immediate = common::Arguments::Type::immediate_t<T>;
+template<typename NameT, typename T>
+using Immediate = common::Arguments::Type::immediate_t<NameT, T>;
 using common::Arguments::Type::a_immediate;
 
 template<typename NameT, std::unsigned_integral TypeT>
 struct Register
-:   common::Arguments::Type::register_t<TypeT>
+:   common::Arguments::Type::register_t<NameT, TypeT>
 {
     using Name = NameT;
     using Type = TypeT;
@@ -45,11 +45,11 @@ struct Register
 };
 
 // Immediate Data Types
-using S8  = Immediate<std::int8_t>;
-using D8  = Immediate<std::uint8_t>;
-using A8  = Immediate<std::uint8_t>;
-using A16 = Immediate<std::uint16_t>;
-using D16 = Immediate<std::uint16_t>;
+using S8  = Immediate<Name::Literal::S8, std::int8_t>;
+using D8  = Immediate<Name::Literal::D8, std::uint8_t>;
+using A8  = Immediate<Name::Literal::A8, std::uint8_t>;
+using A16 = Immediate<Name::Literal::A16, std::uint16_t>;
+using D16 = Immediate<Name::Literal::D16, std::uint16_t>;
 
 // 8-Bit registers
 using A = Register<Name::Register::A, std::uint8_t>;

@@ -13,6 +13,7 @@ using N = decltype("N"_sc);
 using H = decltype("H"_sc);
 using C = decltype("C"_sc);
 }
+
 namespace Register
 {
 using A = decltype("A"_sc);
@@ -29,6 +30,15 @@ using DE = decltype("DE"_sc);
 using HL = decltype("HL"_sc);
 using PC = decltype("PC"_sc);
 using SP = decltype("SP"_sc);
+}
+
+namespace Literal
+{
+using S8  = decltype("S8"_sc);
+using D8  = decltype("D8"_sc);
+using A8  = decltype("A8"_sc);
+using A16 = decltype("A16"_sc);
+using D16 = decltype("D16"_sc);
 }
 
 }
