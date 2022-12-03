@@ -2,10 +2,12 @@
 #include <memory>
 #include <type_traits>
 #include <concepts>
+#include <cstdint>
 
 #include <sc/string_constant.hpp>
 
 #include <common/memory.hpp>
+#include <common/utility/bits.hpp>
 
 #include "arguments.hpp"
 #include "registers.hpp"
@@ -70,45 +72,46 @@ public:
 #pragma region('LD')
     constexpr bool LD(const a_dst auto dst, const a_src auto src)
     {
-        using src_t = typename decltype(src)::Type::Type;
-        src_t value = read(src);
+        using type_t = typename decltype(src)::Type::Type;
+        const type_t value = read(src);
         write(dst, value);
         flags("----"_sc);
         return true;
     }
 
-    // constexpr bool LD(const Args::A dst, const Args::rHL src, const bool inc)
-    // {
-    //     using Args::HL;
-    //     LD(dst, src);
-    //     const HL::Type::Type offsfet = inc ? +1 : -1;
-    //     write(HL{}, read(HL{}) + offset);
-    //     regs.flags('-', '-', '-', '-');
-    //     return true;
-    // }
+    constexpr bool LD(const Args::A, const Args::rHL, const bool inc)
+    {
+        const auto hl_value = regs.template read<LR35902::HL>();
+        const auto rhl_value = mmu.read(hl_value);
+        write(LR35902::Args::A{}, rhl_value);
+        const auto adj_value = [](const bool inc) { return inc ? +1 : -1; }(inc);
+        write(LR35902::Args::HL{}, hl_value + adj_value);
+        flags("----"_sc);
+        return true;
+    }
 
-    // constexpr bool LD(const Args::rHL dst, const Args::A src, const bool inc)
-    // {
-    //     using Args::HL;
-    //     LD(dst, src);
-    //     const HL::size_t offset = inc ? +1 : -1;
-    //     write(HL{}, read(HL{}) + offset);
-    //     regs.flags('-', '-', '-', '-');
-    //     return true;
-    // }
+    constexpr bool LD(const Args::rHL, const Args::A, const bool inc)
+    {
+        const auto a_value = regs.template read<LR35902::A>();
+        const auto hl_value = regs.template read<LR35902::HL>();
+        mmu.write(hl_value, a_value);
+        const auto adj_value = [](const bool inc) { return inc ? +1 : -1; }(inc);
+        write(LR35902::Args::HL{}, hl_value + adj_value);
+        flags("----"_sc);
+        return true;
+    }
 
-    // constexpr bool LD(const Args::HL dst, const Args::SP src, const Args::S8 off)
-    // {
-    //     using T = Args::SP::size_t;
-    //     const T srcv = read(src);
-    //     const T offv = read(off);
-    //     const T adjusted = srcv + offv;
-    //     write(dst, adjusted);
-    //     const bool H = half_carry(srcv, offv);
-    //     const bool C = carry(srcv, offv);
-    //     regs.flags(0, 0, H, C);
-    //     return true;
-    // }
+    constexpr bool LD(const Args::HL dst, const Args::SP src, const Args::S8 off)
+    {
+        const auto srcv = read(src);
+        const auto offv = read(off);
+        const auto result = srcv + offv;
+        write(dst, result);
+        const bool H = half_carry(srcv, offv);
+        const bool C = carry(srcv, offv);
+        flags("00HC"_sc, H, C);
+        return true;
+    }
 #pragma endregion // LD
 
     // constexpr bool INC(const Args::Reg16 auto r)
@@ -633,7 +636,7 @@ public:
         return imm.type.value;
     }
 
-    // Read Address Referenced by T
+    // Read Referenced Address
     template<Type::a_arg_type Type, Access::a_reference Access>
     constexpr uint8_t read(const Args::Argument<Type, Access> arg) const
     {
@@ -650,16 +653,16 @@ public:
     }
 
     // Write value to Memory
-    template<Type::a_arg_type Type, Access::a_reference Access, typename Type::Type>
+    template<Type::a_arg_type Type, Access::a_reference Access>
     constexpr void write(const Args::Argument<Type, Access> arg, const uint8_t value)
     {
-        const auto addr = read(Args::Argument<Type, typename Access::Immediate>{arg.value()}) + Access::offset;
+        using non_ref_t = Args::Argument<Type, ::LR35902::Access::Immediate>;
+        const auto addr = read(non_ref_t{arg.value()}) + Access::offset;
         mmu.write(addr, value);
     }
 
-
     template<typename const_string>
-    constexpr void flags(const_string str, bool F1 = false, bool F2 = false, bool F3 = false, bool F4 = false)
+    constexpr void flags(const_string str, const bool F1 = false, const bool F2 = false, const bool F3 = false, const bool F4 = false)
     {
         static_assert(str.size() == 4, "Flags need 4 values to describe them");
         static_assert(str[0] == '-' || str[0] == '0' || str[0] == '1' || str[0] == 'Z', "Invalid flag value: str[0]");
@@ -676,52 +679,76 @@ public:
         using h_reg_mask_t = decltype(LR35902::Flags::H::reg_mask);
         using c_reg_mask_t = decltype(LR35902::Flags::C::reg_mask);
 
-        constexpr bool zset = str[0] == 'Z';
-        constexpr bool nset = str[1] == 'N';
-        constexpr bool hset = str[2] == 'H';
-        constexpr bool cset = str[3] == 'C';
+        // If there's not a '-' then you will be changed and a 0 is set otherwise a 1
+        constexpr bool z_change = str[0] != '-';
+        constexpr bool n_change = str[1] != '-';
+        constexpr bool h_change = str[2] != '-';
+        constexpr bool c_change = str[3] != '-';
 
-        constexpr bool z = zset && F1;
-        constexpr bool n = nset &&
-                      ((zset && F2)
-                    || F1);
-        constexpr bool h = hset &&
-                      (( zset &&  nset && F3)
-                    || (!zset &&  nset && F2)
-                    || ( zset && !nset && F2)
-                    || F1);
-        constexpr bool c = cset &&
-                      (( zset &&  nset &&  hset && F4)
-                    || (!zset &&  nset &&  hset && F3)
-                    || ( zset && !nset &&  hset && F3)
-                    || ( zset &&  nset && !hset && F3)
-                    || (!zset && !nset &&  hset && F2)
-                    || (!zset &&  nset && !hset && F2)
-                    || ( zset && !nset && !hset && F2)
-                    || F1);
+        constexpr auto change_mask = [=](){
+            return  (z_change ? z_reg_mask_t{} : LR35902::Flags::Z::reg_mask)
+                |   (n_change ? n_reg_mask_t{} : LR35902::Flags::N::reg_mask)
+                |   (h_change ? h_reg_mask_t{} : LR35902::Flags::H::reg_mask)
+                |   (c_change ? c_reg_mask_t{} : LR35902::Flags::C::reg_mask);
+        }();
 
-        constexpr auto change_mask =
-             [](const auto str){ if constexpr (str[0] == '-') return z_reg_mask_t{}; else return LR35902::Flags::Z::reg_mask; }(str)
-            &[](const auto str){ if constexpr (str[1] == '-') return n_reg_mask_t{}; else return LR35902::Flags::N::reg_mask; }(str)
-            &[](const auto str){ if constexpr (str[2] == '-') return h_reg_mask_t{}; else return LR35902::Flags::H::reg_mask; }(str)
-            &[](const auto str){ if constexpr (str[3] == '-') return c_reg_mask_t{}; else return LR35902::Flags::C::reg_mask; }(str);
+        constexpr bool z_set1 = str[0] == '1';
+        constexpr bool n_set1 = str[1] == '1';
+        constexpr bool h_set1 = str[2] == '1';
+        constexpr bool c_set1 = str[3] == '1';
 
-        constexpr auto set_mask =
-             [](const auto str){ if constexpr (str[0] == '1') return LR35902::Flags::Z::reg_mask; else return z_reg_mask_t{}; }(str)
-            &[](const auto str){ if constexpr (str[1] == '1') return LR35902::Flags::N::reg_mask; else return n_reg_mask_t{}; }(str)
-            &[](const auto str){ if constexpr (str[2] == '1') return LR35902::Flags::H::reg_mask; else return h_reg_mask_t{}; }(str)
-            &[](const auto str){ if constexpr (str[3] == '1') return LR35902::Flags::C::reg_mask; else return c_reg_mask_t{}; }(str);
+        constexpr auto set1_mask = [=](){
+            return  (z_set1 ? LR35902::Flags::Z::reg_mask : z_reg_mask_t{}) 
+                |   (n_set1 ? LR35902::Flags::N::reg_mask : n_reg_mask_t{}) 
+                |   (h_set1 ? LR35902::Flags::H::reg_mask : h_reg_mask_t{}) 
+                |   (c_set1 ? LR35902::Flags::C::reg_mask : c_reg_mask_t{});
+        }();
 
-        auto eval_mask =
-             [=](){ if constexpr (z) return LR35902::Flags::Z::reg_mask; else return z_reg_mask_t{}; }()
-            &[=](){ if constexpr (n) return LR35902::Flags::N::reg_mask; else return n_reg_mask_t{}; }()
-            &[=](){ if constexpr (h) return LR35902::Flags::H::reg_mask; else return h_reg_mask_t{}; }()
-            &[=](){ if constexpr (c) return LR35902::Flags::C::reg_mask; else return c_reg_mask_t{}; }();
+        constexpr bool z_eval = str[0] == 'Z';
+        constexpr bool n_eval = str[1] == 'N';
+        constexpr bool h_eval = str[2] == 'H';
+        constexpr bool c_eval = str[3] == 'C';
+
+        constexpr int z_idx = [=](){ return z_eval ? 0 : -1; }();
+        constexpr int n_idx = [=](){ return n_eval ? (z_idx == -1 ? 0 : 1) : -1; }();
+        constexpr int h_idx = [=](){ return h_eval ? (
+            (z_idx == -1 && n_idx == -1) ? 0 :
+            (z_idx == -1 && n_idx ==  0) ? 1 :
+            (z_idx ==  0 && n_idx == -1) ? 1 : 2) : -1; 
+            }();
+        
+        constexpr int c_idx = [=](){ return c_eval ? (
+            (z_idx == -1 && n_idx == -1 && h_idx == -1) ? 0 :
+            (z_idx == -1 && n_idx == -1 && h_idx ==  1) ? 1 :
+            (z_idx == -1 && n_idx ==  1 && h_idx == -1) ? 1 :
+            (z_idx ==  1 && n_idx == -1 && h_idx == -1) ? 1 :
+            (z_idx == -1 && n_idx ==  1 && h_idx ==  1) ? 2 :
+            (z_idx ==  1 && n_idx == -1 && h_idx ==  1) ? 2 :
+            (z_idx ==  1 && n_idx ==  1 && h_idx == -1) ? 2 : 3): -1;
+            }();
+        
+        const auto FN = [=](int idx){
+            switch(idx) {
+                case 1: return F1;
+                case 2: return F2;
+                case 3: return F3;
+                case 4: return F4;
+                default: break;
+            }
+            return false;
+        };
+
+        const auto eval_mask = [=](){ return 0
+            |   (z_eval && FN(z_idx) ? LR35902::Flags::Z::reg_mask : z_reg_mask_t{})
+            |   (n_eval && FN(n_idx) ? LR35902::Flags::N::reg_mask : n_reg_mask_t{})
+            |   (h_eval && FN(h_idx) ? LR35902::Flags::H::reg_mask : h_reg_mask_t{})
+            |   (c_eval && FN(c_idx) ? LR35902::Flags::C::reg_mask : c_reg_mask_t{});
+        }();
 
         auto f = regs. template read<LR35902::F>();
         auto result = LR35902::F{f};
-        result.value() &= ~change_mask; // remove information off all bits to be changed
-        result.value() |= set_mask;     // add all ones information; implicitly adds all 0 information
+        result.value() &= change_mask;  // remove information off all bits to be changed; implicitly adds all 0 information
+        result.value() |= set1_mask;     // add all ones information; implicitly adds all 0 information
         result.value() |= eval_mask;    // adds all evaluated information; implicitly adds all evaluated falses
         regs. template write<LR35902::F>(result);
     }

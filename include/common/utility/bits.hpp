@@ -53,9 +53,9 @@ constexpr auto to_native_endian(const uint8_t b0, const uint8_t b1) -> uint16_t
     return to_native_endian(to_little_endian(b0, b1));
 }
 
-constexpr bool carry(std::unsigned_integral auto a, std::unsigned_integral auto b)
+constexpr bool carry(std::integral auto a, std::integral auto b)
 {
-    static_assert(std::is_same_v<decltype(a), decltype(b)>, "a and b need to be the same type.");
+    // TODO: Look into unintentional overflow
     using T = decltype(a);
     constexpr T check_bit = (std::numeric_limits<T>::max() ^ (std::numeric_limits<T>::max() >> 1));
     const bool alb = a & check_bit;

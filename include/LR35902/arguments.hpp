@@ -91,6 +91,8 @@ concept a_arg_type = a_immediate<T> || a_register<T>;
 namespace LR35902::Args
 {
 
+constexpr bool INC = true;
+constexpr bool DEC = false;
 
 template<LR35902::Type::a_arg_type T, LR35902::Access::a_arg_access A>
 using Argument = common::Arguments::argument_t<T, A>;

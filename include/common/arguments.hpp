@@ -1,6 +1,7 @@
 #pragma once
 #include <concepts>
 
+
 namespace common::Arguments::Access
 {
 
@@ -30,37 +31,44 @@ template<typename T>
 concept a_reference = is_reference_v<T>;
 
 
-} // namespace Arguments::Access
+} // namespace common::Arguments::Access
 namespace common::Arguments::Type
 {
 
-template <std::integral T>
+template <typename NameT, std::integral T>
 struct immediate_t
 {
+    using Name = NameT;
     using Type = T;
     const Type value{};
 };
 
-template<std::unsigned_integral T>
+/**
+ * @brief 
+ * 
+ * @tparam NameT Certain Opcodes only work on certain registers. Defining different "names" can enforce 
+ * @tparam T Representation of the register as a type. Ex. std::same_as<Flags::T, bool> or std::same_as<EAX::T, uint32_t>
+ */
+template<typename NameT, std::unsigned_integral T>
 struct register_t
 {
+    using Name = NameT;
     using Type = T;
-    [[deprecated("Value of a register should not be used")]]
     const Type value{};
 };
 
-template<typename T, std::integral Type = typename T::Type>
-static constexpr bool is_immediate_v = std::is_same_v<T, immediate_t<Type>>;
+template<typename T, typename Name = typename T::Name, std::integral Type = typename T::Type>
+static constexpr bool is_immediate_v = std::is_same_v<T, immediate_t<Name, Type>>;
 template<typename T>
 concept a_immediate = is_immediate_v<T>;
 
-template<typename T, typename Type = typename T::Type>
-static constexpr bool is_register_v = std::is_same_v<T, register_t<Type>>;
+template<typename T, typename Name = typename T::Name, typename Type = typename T::Type>
+static constexpr bool is_register_v = std::is_same_v<T, register_t<Name, Type>>;
 template<typename T>
 concept a_register = is_register_v<T>;
 
 
-} // namespace Arguments::Type
+} // namespace common::Arguments::Type
 namespace common::Arguments
 {
 
@@ -70,18 +78,17 @@ template<
 struct argument_t {
     using Type = TypeT;
     using Access = AccessT;
+    using Name = typename Type::Name;
+    
+    static constexpr Name name{};
 
     constexpr argument_t() = default;
     constexpr argument_t(const size_t value)
-    :   type{value}
+    :   type{static_cast<typename Type::Type>(value)}
     {}
 
     const Type type = {};
-    // will never be instantiating an access
-    // type includes the raw data or memory address being accessed
-    // therefore it needs to be instantiated sometimes
-    // if type is a register it doesn't need to be accessed and the
-    // required info can be deduced at compile time
+    constexpr auto value() const { return type.value; }
 };
 
-} // namespace common::Arguments::Argument
+} // namespace common::Arguments
