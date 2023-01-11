@@ -32,6 +32,11 @@ constexpr bool is_flag_v = a_member_of<T,
 template<typename T>
 concept a_flag = is_flag_v<T>;
 
+template<typename T>
+auto to_unsigned(T value) { 
+    return static_cast<std::make_unsigned_t<T>>(value);
+}
+
 constexpr auto carry = 
     [](const auto a, const decltype(a) b, const decltype(a) c = 0) -> bool {
         using I = std::remove_cvref_t<decltype(a)>;
@@ -107,8 +112,7 @@ public:
     {
         const auto srcv = read(src);
         const auto offv = read(off);
-        using uoffv_t = std::make_unsigned_t<decltype(offv)>;
-        const auto uoffv = static_cast<uoffv_t>(offv);
+        const auto uoffv = to_unsigned(offv);
         const auto result = srcv + offv;
         write(dst, result);
 
