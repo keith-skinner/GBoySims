@@ -53,29 +53,20 @@ constexpr auto to_native_endian(const uint8_t b0, const uint8_t b1) -> uint16_t
     return to_native_endian(to_little_endian(b0, b1));
 }
 
-constexpr bool carry(std::integral auto a, std::integral auto b)
-{
-    // TODO: Look into unintentional overflow
-    using T = decltype(a);
-    constexpr T check_bit = (std::numeric_limits<T>::max() ^ (std::numeric_limits<T>::max() >> 1));
-    const bool alb = a & check_bit;
-    const bool blb = b & check_bit;
-    const bool ablb = (a + b) & check_bit;
-    return (alb && blb && !ablb) || (!alb && !blb && ablb);
-}
 
-constexpr bool half_carry(const std::unsigned_integral auto a, const std::unsigned_integral auto b)
+//Example: 
+//  constexpr auto carry = 
+//      [](const byte a, const byte b, const byte carry) { 
+//          return bit_carry<byte, 8>(a, b, carry); 
+//      };
+//  constexpr auto half_carry = 
+//      [](const byte a, const byte b, const byte carry) { 
+//          return bit_carry<byte, 4>(a, b, carry); 
+//      }; 
+template<std::integral I, std::integral auto BIT>
+constexpr bool bit_carry(const I a, const I b, const I c = 0) //c is carry
 {
-    static_assert(std::is_same_v<decltype(a), decltype(b)>, "a and b need to be the same type.");
-    using T = decltype(a);
-    constexpr T check_bit = (std::numeric_limits<T>::max() ^ (std::numeric_limits<T>::max() >> 1)) >> 4;
-    const bool alb = a & check_bit;
-    const bool blb = b & check_bit;
-    const bool ablb = (a + b) & check_bit;
-    return (alb && blb && !ablb) || (!alb && !blb && ablb);
-}
-
-constexpr bool half_carry(const std::uint16_t a, const std::uint16_t b)
-{
-    return (((a & 0x0FFF) + (b & 0x0FFF)) & 0x1000) == 0x1000;
+    constexpr std::uint64_t bit = (1 << BIT);
+    constexpr std::uint64_t mask = bit - 1;
+    return ((a & mask) - (b & mask) - (c & mask)) & bit;
 }

@@ -8,7 +8,7 @@ namespace LR35902
 {
 
 template <typename Name, typename Repr, std::size_t Msb, std::size_t Lsb>
-using Register = common::register_t<Name, Repr, Msb, Lsb>;
+using Register = common::register_t<Name, Repr, Msb, Lsb>; // Range Lsb to Msb is inclusive
 
 // Single Bit flags
 namespace Flags

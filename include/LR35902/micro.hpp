@@ -11,43 +11,39 @@
 
 #include "arguments.hpp"
 #include "registers.hpp"
-#include "to_register.hpp"
 #include "mmu.hpp"
 
 namespace LR35902
 {
 
-template<typename T>
-constexpr bool is_flag_v =
-       std::is_same_v<T, LR35902::Flags::Z>
-    || std::is_same_v<T, LR35902::Flags::N>
-    || std::is_same_v<T, LR35902::Flags::H>
-    || std::is_same_v<T, LR35902::Flags::C>;
-template<typename T>
-concept a_flag = is_flag_v<T>;
-
 template<typename T, typename ... Ts>
-constexpr bool is_member_of_v = (false || ... || std::is_same_v<T, Ts>);
+constexpr bool is_member_of_v = (false || ... || std::is_same_v<std::remove_cvref_t<T>, Ts>);
+
 template<typename T, typename ... Ts>
 concept a_member_of = is_member_of_v<T, Ts...>;
 
 template<typename T>
-constexpr bool is_dst_v = a_member_of<T,
-    Args::A, Args::B, Args::C, Args::D, Args::E, /* Args::F, */ Args::H, Args::L, // 8 Bit Args
-    Args::AF, Args::BC, Args::DE, Args::HL, Args::SP, // 16 Bit Args
-    Args::zC, Args::rBC, Args::rDE, Args::rHL, Args::zA8, Args::rA16>; // Reference args
-template<typename T>
-concept a_dst = is_dst_v<T>;
+constexpr bool is_flag_v = a_member_of<T, 
+    LR35902::Flags::Z, 
+    LR35902::Flags::N, 
+    LR35902::Flags::H, 
+    LR35902::Flags::C>;
 
 template<typename T>
-constexpr bool is_src_v = a_member_of<T,
-    Args::A, Args::B, Args::C, Args::D, Args::E, Args::H, Args::L, // 8 Bit Registers
-    Args::AF, Args::BC, Args::DE, Args::HL, Args::SP, // 16 Bit Registers
-    Args::zC, Args::zA8, // 8 Bit References
-    Args::rBC, Args::rDE, Args::rHL, Args::rA16, // 16 Bit References
-    Args::D8, Args::D16, Args::S8>; // Immidiates
-template<typename T>
-concept a_src = is_src_v<T>;
+concept a_flag = is_flag_v<T>;
+
+constexpr auto carry = 
+    [](const auto a, const decltype(a) b, const decltype(a) c = 0) -> bool {
+        using I = std::remove_cvref_t<decltype(a)>;
+        return bit_carry<I, std::numeric_limits<I>::digits>(a, b, c);
+    };
+
+constexpr auto half_carry = 
+    [](const auto a, const auto b, const decltype(a) c = 0) -> bool {
+        using I = std::remove_cvref_t<decltype(a)>;
+        return bit_carry<I, std::numeric_limits<I>::digits-4>(a, b, c);
+    };
+
 
 template<typename Registers, typename Memory>
 class Micro
@@ -70,33 +66,39 @@ public:
     }
 
 #pragma region('LD')
-    constexpr bool LD(const a_dst auto dst, const a_src auto src)
+    template<typename Dst, typename Src>
+    constexpr bool LD(const Dst dst, const Src src)
     {
         using type_t = typename decltype(src)::Type::Type;
         const type_t value = read(src);
         write(dst, value);
+
         flags("----"_sc);
         return true;
     }
 
     constexpr bool LD(const Args::A, const Args::rHL, const bool inc)
     {
-        const auto hl_value = regs.template read<LR35902::HL>();
-        const auto rhl_value = mmu.read(hl_value);
+        const auto hl_value = read(LR35902::Args::HL{});
+        const auto rhl_value = read(LR35902::Args::rHL{});
         write(LR35902::Args::A{}, rhl_value);
+
         const auto adj_value = [](const bool inc) { return inc ? +1 : -1; }(inc);
         write(LR35902::Args::HL{}, hl_value + adj_value);
+        
         flags("----"_sc);
         return true;
     }
 
     constexpr bool LD(const Args::rHL, const Args::A, const bool inc)
     {
-        const auto a_value = regs.template read<LR35902::A>();
-        const auto hl_value = regs.template read<LR35902::HL>();
-        mmu.write(hl_value, a_value);
+        const auto a_value = read(LR35902::Args::A{});
+        const auto hl_value = read(LR35902::Args::HL{});
+        write(LR35902::Args::rHL{}, a_value);
+
         const auto adj_value = [](const bool inc) { return inc ? +1 : -1; }(inc);
         write(LR35902::Args::HL{}, hl_value + adj_value);
+
         flags("----"_sc);
         return true;
     }
@@ -105,14 +107,20 @@ public:
     {
         const auto srcv = read(src);
         const auto offv = read(off);
+        using uoffv_t = std::make_unsigned_t<decltype(offv)>;
+        const auto uoffv = static_cast<uoffv_t>(offv);
         const auto result = srcv + offv;
         write(dst, result);
-        const bool H = half_carry(srcv, offv);
-        const bool C = carry(srcv, offv);
+
+        const bool H = half_carry(srcv, uoffv);
+        const bool C = carry(srcv, uoffv);
         flags("00HC"_sc, H, C);
         return true;
     }
 #pragma endregion // LD
+
+#pragma region('MATH')
+    // constexpr bool INC(const )
 
     // constexpr bool INC(const Args::Reg16 auto r)
     // {
@@ -625,7 +633,7 @@ public:
     constexpr auto read(const Args::Argument<Type, Access> arg) const -> typename Type::Type
     {
         using arg_t = decltype(arg);
-        using reg_t = to_register_t<arg_t>;
+        using reg_t = LR35902::Args::to_register_v<arg_t>;
         return regs. template read<reg_t>();
     }
 
@@ -649,7 +657,7 @@ public:
     constexpr void write(const Args::Argument<Type, Access> reg, const typename Type::Type value)
     {
         using arg_t = decltype(reg);
-        regs.write(to_register_t<arg_t>{value});
+        regs.write(typename Args::to_register_v<arg_t>(value));
     }
 
     // Write value to Memory

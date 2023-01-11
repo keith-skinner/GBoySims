@@ -16,6 +16,14 @@ struct Opcode {
     const int cycles_no_action = 0;
 };
 
+template<typename Arg1 = std::void_t<>, typename Arg2 = std::void_t<>, typename Arg3 = std::void_t<>>
+struct OpcodeDef 
+{
+    using arg1 = Arg1;
+    using arg2 = Arg2;
+    using arg3 = Arg3;
+};
+
 // TODO: Remove name from Opcodes and only include when debugging.
 
 // (C) means to derefference the offset given by C from the base address 0xFF00
@@ -298,7 +306,7 @@ constexpr std::array<Opcode, 256> opcodes {{
     {0xFF, false, "RST 38H", 1, 16}
 }};
 
-const std::array<Opcode, 256> cb_opcodes {{
+constexpr std::array<Opcode, 256> cb_opcodes {{
     {0x00, false, "RLC B", 2, 8},
     {0x01, false, "RLC C", 2, 8},
     {0x02, false, "RLC D", 2, 8},
