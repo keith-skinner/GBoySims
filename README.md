@@ -1,6 +1,6 @@
 # GBoySim
 
-## Explanation
+## <ins>Explanation</ins>
 
 I was looking for a project to help me better understand the low-level / EE environment for embedded systems as well as provide proof of my understanding of C++ 11, 14, 17, 20 concepts.
 I'm starting with implementing a Game Boy simulator and hopefully moving onto more modern systems. The gameboy architecture has a number of interesting design choices such as:
@@ -15,20 +15,30 @@ I'm starting with implementing a Game Boy simulator and hopefully moving onto mo
     * up to 2MB of ROM
 * A Pixel Processing Unit utilizing a 8x8 bit tile structure for a reduced memory footprint
 * A 3 layer system for rendering graphics (Background, Window, and Sprite) which the screen is then a viewport into.
+* Several components utilizing "banks" reducing the memory map but still allowing access to relatively large amounts of memory.
 
-## Build and Run
+## <ins>Build and Run</ins>
 
+cmake -B ./build  
+cmake --build .
 
+## <ins>References</ins>
 
-## References
+### Optables:
+https://gbdev.io/gb-opcodes//optables/
+https://meganesulli.com/generate-gb-opcodes/
 
-https://robdor.com/2016/08/10/gameboy-emulator-half-carry-flag  
-https://gekkio.fi/files/gb-docs/gbctr.pdf  
-http://imrannazar.com/GameBoy-Emulation-in-JavaScript:-GPU-Timings  
-https://gbdev.io/gb-opcodes//optables/  
-http://gameboy.mongenel.com/dmg/asmmemmap.html  
-https://www.youtube.com/watch?v=HyzD8pNlpwI&ab_channel=media.ccc.de  
-https://archive.org/details/GameBoyProgManVer1.1/page/n47/mode/2up  
-https://meganesulli.com/generate-gb-opcodes/  
-https://problemkaputt.de/pandocs.htm  
-https://gbdev.io/pandocs/About.html  
+### General Guides:
+https://gekkio.fi/files/gb-docs/gbctr.pdf
+http://gameboy.mongenel.com/dmg/asmmemmap.html
+https://gbdev.io/pandocs/About.html
+https://problemkaputt.de/pandocs.htm
+https://archive.org/details/GameBoyProgManVer1.1/page/n47/mode/2up
+http://imrannazar.com/GameBoy-Emulation-in-JavaScript:-GPU-Timings
+https://www.youtube.com/watch?v=HyzD8pNlpwI&ab_channel=media.ccc.de
+
+### DAA Instruction:
+https://forums.nesdev.org/viewtopic.php?t=15944#:~:text=The%20DAA%20instruction%20adjusts%20the,%2C%20lower%20nybble%2C%20or%20both.
+
+### Half-Carry flag:
+https://robdor.com/2016/08/10/gameboy-emulator-half-carry-flag

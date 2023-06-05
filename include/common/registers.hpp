@@ -2,13 +2,35 @@
 #include <tuple>
 #include <cstdint>
 #include <type_traits>
-#include <cib/tuple.hpp>
 #include <algorithm>
+#include <cib/tuple.hpp>
+
+#include "utility/meta.hpp"
 
 namespace common
 {
 
+// register_file_t is templated with register_def_t's that are templated with regster_t's
+// how to select the correct register_def_t inside a register_file_t after getting passed a register_t
+
 // https://github.com/intel/compile-time-init-build
+
+
+template<typename Register>
+static constexpr std::size_t get_index_helper()
+{
+    return -1;
+}
+
+template<typename Register, typename RegDef, typename ... Rest>
+static constexpr std::size_t get_index_helper()
+{
+    if constexpr (RegDef::template is_valid_register<Register>)
+        return 0;
+    else 
+        return 1 + get_index_helper<Register, Rest...>();
+}
+
 
 template <
     typename NameT,
@@ -17,29 +39,23 @@ template <
     std::size_t LsbV>
 class register_t
 {
-private:
-    ReprT m_value;
 public:
-    using This = register_t<NameT, ReprT, MsbV, LsbV>;
     using Name = NameT;
     using Repr = ReprT;
     static constexpr Name name{};
     static constexpr std::size_t msb = MsbV;
     static constexpr std::size_t lsb = LsbV;
     static constexpr std::size_t width = msb - lsb + 1;
-    static constexpr std::size_t repr_width = sizeof(Repr) * 8;
 
     static_assert(lsb <= msb, "Msb needs to be lower than or equal to Lsb");
-    static_assert(width <= repr_width, "Msb must fit within the size of the representation");
 
-    constexpr register_t(Repr const & value) noexcept : m_value{value} {}
+    Repr value{};
+    explicit operator std::uint64_t() const { return value; }
+
     constexpr register_t() noexcept = default;
-    constexpr register_t(const register_t& other) noexcept = default;
-    constexpr register_t(register_t&& other) noexcept = default;
-    constexpr register_t& operator=(const register_t&) noexcept = default;
-    constexpr register_t& operator=(register_t&&) noexcept  = default;
+    constexpr register_t(Repr value) noexcept : value{value} {};
 
-    static constexpr uint64_t bit_mask = [](){
+    static constexpr uint64_t bit_mask = []() consteval -> std::uint64_t {
         if constexpr (width == 64)
             return 0xFFFFFFFFFFFFFFFF;
         else
@@ -50,26 +66,21 @@ public:
     }();
     static constexpr uint64_t reg_mask = bit_mask << lsb;
 
-
-    //extract
+    //extract the bits represented by this register from data
     template<typename DataStore>
-    [[nodiscard]]
-    static constexpr Repr read(DataStore const & data)
+    static constexpr auto read(const DataStore data)
     {
         return (data & reg_mask) >> lsb;
     }
 
-    //insert
-    template <std::unsigned_integral DataStore>
-    constexpr void write(DataStore & data)
+    //insert the bits represented by this register from value into data
+    template <typename DataStore>
+    static constexpr void write(DataStore & data, const auto value)
     {
         // align value bits with bits to insert value into
         // zero out bits to insert value into and insert value into data
-        data = (static_cast<uint64_t>(m_value) << lsb) | (data & ~reg_mask);
+        data = (static_cast<std::uint64_t>(value) << lsb) | (data & ~reg_mask);
     }
-
-    constexpr ReprT & value() { return m_value; }
-    constexpr ReprT value() const { return m_value; }
 };
 
 
@@ -87,84 +98,54 @@ template <
     typename ReprT,
     std::size_t WidthV,
     typename ... SubRegisters>
+
 class registerdef_t
 {
-private:
-    ReprT value;
 public:
-    using This = registerdef_t<NameT, ReprT, WidthV, SubRegisters...>;
     using Name = NameT;
     using Repr = ReprT;
-    using SubRegistersTuple = cib::tuple<SubRegisters...>;
     static constexpr Name name{};
-    static constexpr std::size_t repr_width = sizeof(Repr) * 8;
+    static constexpr std::size_t repr_width = (sizeof(Repr) * 8) - 1;
     static constexpr std::size_t width = WidthV;
 
+    static_assert((width > 0), "Register must have a Width of at least 1");
+    static_assert((width >= repr_width), "Repr must be able to contain width");
+    static_assert((true && ... && (SubRegisters::msb <= width)), "SubRegister must be contained within width");
+    static_assert((true && ... && (SubRegisters::msb <= repr_width)), "SubRegister must be contained within representation");
 
-    static_assert(width > 0, "Register must have a Width of at least 1");
-    static_assert(width <= repr_width, "Repr must be able to contain width");
-    static_assert( (true && ... && (SubRegisters::width <= width)), "SubRegister must be contained within Parent Register width" );
-
-
-    constexpr registerdef_t(const registerdef_t& reg): value{reg.value} {}
-    constexpr registerdef_t(registerdef_t && reg) : value {reg.value} {}
-    constexpr registerdef_t & operator = (const registerdef_t & reg) { value = reg.value; return *this; }
-    constexpr registerdef_t & operator = (registerdef_t && reg) { value = reg.value; return *this; }
-    constexpr registerdef_t(Repr value): value{value} {}
     template<typename ... SubRegisterTypes>
-    constexpr registerdef_t(SubRegisterTypes... subregisters)
+    constexpr 
+    registerdef_t(SubRegisterTypes... subregisters)
     : value {}
     {
-        if constexpr (sizeof...(subregisters) == 0)
-            SubRegistersTuple{}.for_each([&](auto field){ write(field); });
-        else {
-            SubRegistersTuple{}.for_each([&](auto field){ write(field); });
-            cib::make_tuple(subregisters...).for_each([&](auto field){ write(field); });
-        }
+        (write(std::forward<SubRegisterTypes>(subregisters)), ...);
     }
 
-    /**
-     * @brief Is this SubRegister in the list of SubRegisters...
-     *
-     * @tparam SubRegister
-     * @return true Subregister is a member of SubRegisters...
-     * @return false SubRegister is not a member of SubRegisters...
-     */
-    template<typename SubRegister>
-    [[nodiscard]]
-    static constexpr bool is_valid_register(SubRegister = SubRegister{})
-    {
-        //spdlog::info("is_valid_register: {}", SubRegister::name);
-        return SubRegistersTuple{}.fold_right(false, [](auto field, bool isValid) {
-            return ( isValid || std::is_same_v<SubRegister, decltype(field)> );
-        });
-    }
+    template <typename SubRegister>
+    static constexpr bool is_valid_register = is_member_of_v<std::remove_cvref_t<SubRegister>, SubRegisters...>;
 
     template <typename SubRegister>
     constexpr void write(SubRegister reg)
     {
-        static_assert(is_valid_register<SubRegister>(),
-            "Must be writing to a registered subregister");
-        reg.write(this->value);
+        static_assert(is_valid_register<SubRegister>, "Must be writing to a registered subregister.");
+        SubRegister::write(value, reg);
     }
 
     template <typename SubRegister>
-    constexpr auto read() const {
-        static_assert(is_valid_register<SubRegister>(),
-            "Must be reading from a registered subregister");
-        return SubRegister::read(this->value);
+    constexpr Repr read() const {
+        static_assert(is_valid_register<SubRegister>, "Must be reading from a registered subregister");
+        return SubRegister::read(value);
     }
+
+private:
+    Repr value{};
 };
 
-template <typename NameT, typename ... Registers>
+template <typename NameT, typename ... SubRegisters>
 class registerfile_t {
-    std::tuple<Registers...> registers;
 public:
-    using This = registerfile_t<NameT, Registers...>;
     using Name = NameT;
     static constexpr Name name{};
-
-    using RegisterDefTuple = cib::tuple<Registers...>;
 
     template<typename ... RegisterList>
     constexpr registerfile_t(RegisterList... regs)
@@ -173,48 +154,29 @@ public:
         (set<RegisterList>(regs), ...);
     }
 
-    template <typename R>
-    constexpr void set(R reg)
+
+    template <typename SubRegister>
+    constexpr void set(SubRegister reg)
     {
-        std::get<R>(registers) = reg;
+        using Register = std::remove_cvref_t<SubRegister>;
+        std::get<Register>(registers) = reg;
     }
 
-    template<typename SubRegister>
-    static constexpr bool is_valid_register([[maybe_unused]] SubRegister r = SubRegister{})
-    {
-        return RegisterDefTuple{}.fold_right(false, [](auto field, bool isValid) {
-            return isValid || field.template is_valid_register<SubRegister>();
-        });
-    }
-
-    template<typename SubRegister>
-    static constexpr std::size_t get_index([[maybe_unused]]SubRegister r = SubRegister{})
-    {
-        static_assert(is_valid_register<SubRegister>(), "SubRegister not defined for this register file");
-        return std::get<1>(RegisterDefTuple{}.fold_left(std::make_tuple(false, 0), [](auto accumulator, auto field) {
-            if (std::get<0>(accumulator))
-                return accumulator; // already found so skip
-            else if (decltype(field)::template is_valid_register<decltype(r)>())
-                return std::make_tuple(true, std::get<1>(accumulator));
-            else
-                return std::make_tuple(false, ++std::get<1>(accumulator));
-        }));
-    }
+    template <typename SubRegister>
+    static constexpr bool is_valid_register = (false || ... || SubRegisters::template is_valid_register<SubRegister>);
 
     template<typename SubRegister>
     constexpr void write(SubRegister reg)
     {
-        static_assert(is_valid_register<SubRegister>(),
-            "Must be writing to a registered subregister");
-        std::get<( get_index<SubRegister>() )>(registers).write(reg);
+        std::get<(get_index<SubRegister>)>(registers).write(reg);
     }
 
     template<typename SubRegister>
     constexpr auto read([[maybe_unused]] SubRegister r = SubRegister{})
     {
-        static_assert(is_valid_register<SubRegister>(),
+        static_assert(is_valid_register<SubRegister>,
             "Must be reading from a registered subregister");
-        return std::get<( get_index<SubRegister>() )>(registers).template read<SubRegister>();
+        return std::get<(get_index<SubRegister>)>(registers).template read<SubRegister>();
     }
 
     template<typename ... FlagRegisters>
@@ -223,10 +185,16 @@ public:
         // do nothing if empty
         if constexpr (sizeof...(FlagRegisters) == 0)
             return;
-        static_assert((true && ... && is_valid_register<FlagRegisters>()),
+        static_assert((true && ... && is_valid_register<FlagRegisters>),
             "FlagRegisters must be registered to this register file");
         (write(rflags), ...);
     }
+
+    template <typename SubRegister>
+    static constexpr std::size_t get_index = get_index_helper<SubRegister, SubRegisters...>();
+
+private:
+    std::tuple<SubRegisters...> registers;
 };
 
 

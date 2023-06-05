@@ -1,6 +1,7 @@
 #pragma once
 #include <concepts>
 #include <common/arguments.hpp>
+#include <variant>
 #include "registers.hpp"
 #include "names.hpp"
 
@@ -93,8 +94,8 @@ concept a_arg_type = a_immediate<T> || a_register<T>;
 namespace LR35902::Args
 {
 
-constexpr bool INC = true;
-constexpr bool DEC = false;
+static constexpr std::uint16_t INC = +1;
+static constexpr std::uint16_t DEC = -1;
 
 template<LR35902::Type::a_arg_type T, LR35902::Access::a_arg_access A>
 using Argument = common::Arguments::argument_t<T, A>;

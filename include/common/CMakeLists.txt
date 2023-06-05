@@ -5,7 +5,7 @@ target_sources(
     arguments.hpp
     registers.hpp
     memory.hpp
-    
+    utility/meta.hpp
 )
 target_include_directories(
     common

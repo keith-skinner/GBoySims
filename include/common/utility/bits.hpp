@@ -70,3 +70,7 @@ constexpr bool bit_carry(const I a, const I b, const I c = 0) //c is carry
     constexpr std::uint64_t mask = bit - 1;
     return ((a & mask) - (b & mask) - (c & mask)) & bit;
 }
+
+constexpr auto to_unsigned(const std::integral auto value) { 
+    return static_cast<std::make_unsigned_t<decltype(value)>>(value);
+}

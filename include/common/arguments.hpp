@@ -83,7 +83,7 @@ struct argument_t {
     static constexpr Name name{};
 
     constexpr argument_t() = default;
-    constexpr argument_t(const size_t value)
+    constexpr argument_t(const std::integral auto value)
     :   type{static_cast<typename Type::Type>(value)}
     {}
 

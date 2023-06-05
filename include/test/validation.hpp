@@ -96,7 +96,7 @@ struct RegRecorder
     template<typename SubRegister>
     constexpr auto write(SubRegister reg = SubRegister{})
     {
-        records.push_back({s_write(), reg.name(), reg.value()});
+        records.push_back({s_write(), reg.name, reg.value});
         return Base::write(reg);
     }
 

@@ -33,6 +33,16 @@ target_compile_options(
     $<$<CONFIG:DEBUG>:-Wall>
     $<$<CONFIG:DEBUG>:-Wextra>
     $<$<CONFIG:DEBUG>:-Wpedantic>
+    $<$<CONFIG:DEBUG>:-fsanitize=address>
+    $<$<CONFIG:DEBUG>:-fsanitize=thread>
+    $<$<CONFIG:DEBUG>:-fsanitize=undefined>
+)
+target_link_options(
+    ${PROJECT_NAME}
+    PRIVATE
+    $<$<CONFIG:DEBUG>:-fsanitize=address>
+    $<$<CONFIG:DEBUG>:-fsanitize=thread>
+    $<$<CONFIG:DEBUG>:-fsanitize=undefined>
 )
 target_sources(
     ${PROJECT_NAME}

@@ -44,6 +44,7 @@ namespace LR35902::Definitions
 
 template <typename Name, typename Repr, std::size_t Width, typename ... SubRegisters>
 using RegisterDef = common::registerdef_t<Name, Repr, Width, SubRegisters...>;
+
 using AF = RegisterDef<Name::Register::AF, uint16_t, 16, ::LR35902::AF, ::LR35902::A, ::LR35902::F, ::LR35902::Flags::Z, ::LR35902::Flags::N, ::LR35902::Flags::H, ::LR35902::Flags::C>;
 using BC = RegisterDef<Name::Register::BC, uint16_t, 16, ::LR35902::BC, ::LR35902::B, ::LR35902::C>;
 using DE = RegisterDef<Name::Register::DE, uint16_t, 16, ::LR35902::DE, ::LR35902::D, ::LR35902::E>;

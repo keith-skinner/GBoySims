@@ -3,6 +3,7 @@
 #include <LR35902/micro.hpp>
 #include <LR35902/mmu.hpp>
 #include <LR35902/registers.hpp>
+#include <common/utility/bits.hpp>
 
 #include "../validation.hpp"
 
@@ -483,7 +484,9 @@ TEST(LR35902_micro, LD_HL_SP_S8_negative) // LD HL, SP+S8
 
     registers.set(LR35902::SP{0x1234});
 
-    micro.LD(LR35902::Args::HL{}, LR35902::Args::SP{}, LR35902::Args::S8{static_cast<std::size_t>(-0x34)});
+    const auto s8 = LR35902::Args::S8{-0x34};
+
+    micro.LD(LR35902::Args::HL{}, LR35902::Args::SP{}, s8 );
 
     EXPECT_EQ(memory.records.size(), 0);
     EXPECT_EQ(registers.records.size(), 4);

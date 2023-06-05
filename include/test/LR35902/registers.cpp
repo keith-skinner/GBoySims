@@ -3,10 +3,11 @@
 
 TEST(LR35902_registers, RegisterDef)
 {
-    LR35902::Definitions::AF af;
-    EXPECT_TRUE(af.is_valid_register<LR35902::A>());
-    EXPECT_TRUE(af.is_valid_register<LR35902::F>());
-    EXPECT_TRUE(af.is_valid_register<LR35902::AF>());
+    using AFDef = LR35902::Definitions::AF;
+    AFDef af;
+    EXPECT_TRUE(AFDef::is_valid_register<LR35902::A>);
+    EXPECT_TRUE(AFDef::is_valid_register<LR35902::F>);
+    EXPECT_TRUE(AFDef::is_valid_register<LR35902::AF>);
 
     //default initializes to zero
     EXPECT_EQ(0, af.read<LR35902::A>());
@@ -21,7 +22,7 @@ TEST(LR35902_registers, RegisterDef)
     EXPECT_FALSE( (std::is_same_v<LR35902::A, LR35902::B>) );
     EXPECT_FALSE( (std::is_same_v<LR35902::F, LR35902::B>) );
     EXPECT_FALSE( (std::is_same_v<LR35902::AF, LR35902::B>) );
-    EXPECT_FALSE( af.is_valid_register<LR35902::B>() );
+    EXPECT_FALSE( AFDef::is_valid_register<LR35902::B> );
     // af.write(LR35902::B{4}); // compile error expected because B isn't a registered subregister of AF 
     // AF includes only subregisters AF, A, F, and the ZNHC flags b/c b
 
@@ -59,25 +60,25 @@ TEST(LR35902_registers, RegisterFile)
 {
     [[maybe_unused]]
     LR35902::RegisterFile rf;
-    EXPECT_TRUE(rf.is_valid_register<LR35902::A>());
-    EXPECT_EQ(0, rf.get_index<LR35902::A>());
-    EXPECT_EQ(0, rf.get_index<LR35902::F>());
-    EXPECT_EQ(0, rf.get_index<LR35902::AF>());
-    EXPECT_EQ(0, rf.get_index<LR35902::Flags::Z>());
-    EXPECT_EQ(0, rf.get_index<LR35902::Flags::N>());
-    EXPECT_EQ(0, rf.get_index<LR35902::Flags::H>());
-    EXPECT_EQ(0, rf.get_index<LR35902::Flags::C>());
-    EXPECT_EQ(1, rf.get_index<LR35902::B>());
-    EXPECT_EQ(1, rf.get_index<LR35902::C>());
-    EXPECT_EQ(1, rf.get_index<LR35902::BC>());
-    EXPECT_EQ(2, rf.get_index<LR35902::D>());
-    EXPECT_EQ(2, rf.get_index<LR35902::E>());
-    EXPECT_EQ(2, rf.get_index<LR35902::DE>());
-    EXPECT_EQ(3, rf.get_index<LR35902::H>());
-    EXPECT_EQ(3, rf.get_index<LR35902::L>());
-    EXPECT_EQ(3, rf.get_index<LR35902::HL>());
-    EXPECT_EQ(4, rf.get_index<LR35902::PC>());
-    EXPECT_EQ(5, rf.get_index<LR35902::SP>());
+    EXPECT_TRUE(LR35902::RegisterFile::is_valid_register<LR35902::A>);
+    EXPECT_EQ(0, rf.get_index<LR35902::A>);
+    EXPECT_EQ(0, rf.get_index<LR35902::F>);
+    EXPECT_EQ(0, rf.get_index<LR35902::AF>);
+    EXPECT_EQ(0, rf.get_index<LR35902::Flags::Z>);
+    EXPECT_EQ(0, rf.get_index<LR35902::Flags::N>);
+    EXPECT_EQ(0, rf.get_index<LR35902::Flags::H>);
+    EXPECT_EQ(0, rf.get_index<LR35902::Flags::C>);
+    EXPECT_EQ(1, rf.get_index<LR35902::B>);
+    EXPECT_EQ(1, rf.get_index<LR35902::C>);
+    EXPECT_EQ(1, rf.get_index<LR35902::BC>);
+    EXPECT_EQ(2, rf.get_index<LR35902::D>);
+    EXPECT_EQ(2, rf.get_index<LR35902::E>);
+    EXPECT_EQ(2, rf.get_index<LR35902::DE>);
+    EXPECT_EQ(3, rf.get_index<LR35902::H>);
+    EXPECT_EQ(3, rf.get_index<LR35902::L>);
+    EXPECT_EQ(3, rf.get_index<LR35902::HL>);
+    EXPECT_EQ(4, rf.get_index<LR35902::PC>);
+    EXPECT_EQ(5, rf.get_index<LR35902::SP>);
 
     // default initializes to zero
     EXPECT_EQ(0, rf.read<LR35902::A>());

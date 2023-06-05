@@ -13,6 +13,8 @@
 #include "registers.hpp"
 #include "mmu.hpp"
 
+constexpr auto FORCE_READ_WRITE_FLAGS = false;
+
 namespace LR35902
 {
 
@@ -32,10 +34,21 @@ constexpr bool is_flag_v = a_member_of<T,
 template<typename T>
 concept a_flag = is_flag_v<T>;
 
-template<typename T>
-auto to_unsigned(T value) { 
-    return static_cast<std::make_unsigned_t<T>>(value);
-}
+template<typename R8>
+concept a_common_r8 = a_member_of<R8,
+        LR35902::Args::A, LR35902::Args::B,
+        LR35902::Args::C, LR35902::Args::D, 
+        LR35902::Args::E, LR35902::Args::H,
+        LR35902::Args::L, LR35902::Args::rHL>;
+
+template<typename R16>
+concept a_common_r16 = a_member_of<R16,
+        LR35902::Args::BC, LR35902::Args::DE,
+        LR35902::Args::HL, LR35902::Args::SP>;
+
+template<typename Arg8>
+concept a_common_arg8 = a_common_r8<Arg8> || 
+        a_member_of<Arg8, LR35902::Args::D8>;
 
 constexpr auto carry = 
     [](const auto a, const decltype(a) b, const decltype(a) c = 0) -> bool {
@@ -44,7 +57,7 @@ constexpr auto carry =
     };
 
 constexpr auto half_carry = 
-    [](const auto a, const auto b, const decltype(a) c = 0) -> bool {
+    [](const std::unsigned_integral auto a, const std::unsigned_integral auto b, const decltype(a) c = 0) -> bool {
         using I = std::remove_cvref_t<decltype(a)>;
         return bit_carry<I, std::numeric_limits<I>::digits-4>(a, b, c);
     };
@@ -58,6 +71,7 @@ public:
 private:
     Registers& regs;
     Memory& mmu;
+    bool IME = false; // interrupt master enable
 public:
 
     Micro(Registers& regs, Memory& mmu)
@@ -70,318 +84,358 @@ public:
         return true;
     }
 
+    bool getIME() const
+    {
+        return IME;
+    }
+
 #pragma region('LD')
-    template<typename Dst, typename Src>
-    constexpr bool LD(const Dst dst, const Src src)
+
+    template<
+        typename DstType, typename DstAccess,
+        typename SrcType, typename SrcAccess>
+    constexpr bool LD(
+        const LR35902::Args::Argument<DstType, DstAccess> dst,
+        const LR35902::Args::Argument<SrcType, SrcAccess> src)
     {
-        using type_t = typename decltype(src)::Type::Type;
-        const type_t value = read(src);
+        const auto value = read(src);
         write(dst, value);
-
         flags("----"_sc);
         return true;
     }
 
-    constexpr bool LD(const Args::A, const Args::rHL, const bool inc)
+    constexpr bool LD(const Args::A, const Args::rHL, const std::uint16_t adj)
     {
-        const auto hl_value = read(LR35902::Args::HL{});
-        const auto rhl_value = read(LR35902::Args::rHL{});
-        write(LR35902::Args::A{}, rhl_value);
-
-        const auto adj_value = [](const bool inc) { return inc ? +1 : -1; }(inc);
-        write(LR35902::Args::HL{}, hl_value + adj_value);
-        
+        const auto hl = read(LR35902::Args::HL{});
+        const auto rhl = read(LR35902::Args::rA16{hl});
+        write(LR35902::Args::A{}, rhl);
+        write(LR35902::Args::HL{}, hl + adj);
         flags("----"_sc);
         return true;
     }
 
-    constexpr bool LD(const Args::rHL, const Args::A, const bool inc)
+    constexpr bool LD(const Args::rHL, const Args::A, const std::uint16_t adj)
     {
-        const auto a_value = read(LR35902::Args::A{});
-        const auto hl_value = read(LR35902::Args::HL{});
-        write(LR35902::Args::rHL{}, a_value);
-
-        const auto adj_value = [](const bool inc) { return inc ? +1 : -1; }(inc);
-        write(LR35902::Args::HL{}, hl_value + adj_value);
-
+        const auto a = read(LR35902::Args::A{});
+        const auto hl = read(LR35902::Args::HL{});
+        write(LR35902::Args::rA16{hl}, a);
+        write(LR35902::Args::HL{}, hl + adj);
         flags("----"_sc);
         return true;
     }
 
-    constexpr bool LD(const Args::HL dst, const Args::SP src, const Args::S8 off)
+    constexpr bool LD(const Args::HL, const Args::SP, const Args::S8 off)
     {
-        const auto srcv = read(src);
-        const auto offv = read(off);
-        const auto uoffv = to_unsigned(offv);
-        const auto result = srcv + offv;
-        write(dst, result);
-
-        const bool H = half_carry(srcv, uoffv);
-        const bool C = carry(srcv, uoffv);
+        const auto sp = read(LR35902::Args::SP{});
+        const auto voff = static_cast<decltype(sp)>(read(off)); // convert to unsigned
+        write(LR35902::Args::HL{}, sp + voff);
+        const bool H = half_carry(sp, voff);
+        const bool C = carry(sp, voff);
         flags("00HC"_sc, H, C);
         return true;
     }
-#pragma endregion // LD
+
+#pragma endregion("LD")
 
 #pragma region('MATH')
-    // constexpr bool INC(const )
 
-    // constexpr bool INC(const Args::Reg16 auto r)
-    // {
-    //     write(r, read(r) + OFFSET);
-    //     regs.flags('-', '-', '-', '-');
-    //     return true;
-    // }
+    constexpr bool INC(const a_common_r16 auto r)
+    {
+        write(r, read(r) + 1);
+        flags("----"_sc);
+        return true;
+    }
+    
+    constexpr bool INC(const a_common_r8 auto r)
+    {
+        using value_t = typename decltype(r)::Type::Type;
+        const value_t value = read(r);
+        write(r, value + 1);
+        const bool Z = value + 1 == 0;
+        const bool H = half_carry(value, 1);
+        flags("Z0H-"_sc, Z, H);
+        return true;
+    }
 
-    // constexpr bool INC(const Args::StdArg auto r)
-    // {
-    //     const auto new_value = read(r) + OFFSET;
-    //     write(r, new_value);
-    //     const bool Z = new_value == 0;
-    //     const bool H = half_carry(new_value, +OFFSET);
-    //     regs.flags(Z, 0, H, '-');
-    //     return true;
-    // }
+    constexpr bool DEC(const a_common_r16 auto r)
+    {
+        write(r, read(r) - 1);
+        regs.flags("----"_sc);
+        return true;
+    }
 
-//     constexpr bool DEC(const Args::Reg16 auto r)
-//     {
-//         write(r, read(r) - OFFSET);
-//         regs.flags('-', '-', '-', '-');
-//         return true;
-//     }
-//     constexpr bool DEC(const Args::StdArg auto r)
-//     {
-//         const auto value = read(r);
-//         const auto new_value = value - OFFSET;
-//         write(r, new_value);
-//         const bool Z = new_value == 0;
-//         const bool H = half_carry(value, -OFFSET);
-//         regs.flags(Z, 1, H, '-');
-//         return true;
-//     }
+    constexpr bool DEC(const a_common_arg8 auto r)
+    {
+        using value_t = typename decltype(r)::Type::Type;
+        const value_t value = read(r);
+        write(r, value - 1);
+        const bool Z = value - 1 == 0;
+        const bool H = half_carry(value, -1);
+        regs.flags("Z1H-"_sc, Z, H);
+        return true;
+    }
 
-//     constexpr bool ADD(const Args::HL a, const Args::Reg16 auto b)
-//     {
-//         const auto av = read(a);
-//         const auto bv = read(b);
-//         const auto v = (av + bv);
-//         write(a, v);
-//         const bool H = half_carry(av, bv);
-//         const bool C = carry(av, bv);
-//         regs.flags('-', 0, H, C);
-//         return true;
-//     }
-//     constexpr bool ADD(const Args::A a, const Args::StdArgImm auto b)
-//     {
-//         using T = Args::A::size_t;
-//         const T av = read(a);
-//         const T bv = read(b);
-//         const T v = (av + bv);
-//         write(a, v);
-//         const bool Z = v == 0;
-//         const bool H = half_carry(av, bv);
-//         const bool C = carry(av, bv);
-//         regs.flags(Z, 0, H, C);
-//         return true;
-//     }
-//     constexpr bool ADD(const Args::SP a, const Args::S8 b)
-//     {
-//         using T = Args::SP::size_t;
-//         const T av = read(a);
-//         const T bv = read(b);
-//         const T v = (av + bv);
-//         write(a, v);
-//         const bool H = half_carry(av, static_cast<uint16_t>(bv));
-//         const bool C = carry(av, static_cast<uint16_t>(bv));
-//         regs.flags(0, 0, H, C);
-//         return true;
-//     }
+    constexpr bool ADD(const Args::HL a, const a_common_r16 auto b)
+    {
+        const std::uint16_t av = read(a);
+        const std::uint16_t bv = read(b);
+        const std::uint16_t v = (av + bv);
+        write(a, v);
+        const bool H = half_carry(av, bv);
+        const bool C = carry(av, bv);
+        flags("-0HC"_sc, H, C);
+        return true;
+    }
 
-//     constexpr bool ADC(const Args::A a, const Args::StdArgImm auto b)
-//     {
-//         const uint8_t av = read(a);
-//         const uint8_t bv = read(b) + regs.test(Registers::Flags::C);
-//         const auto v = av + bv;
-//         write(a, v);
-//         const bool Z = v == 0;
-//         const bool H = half_carry(av, bv);
-//         const bool C = carry(av, bv);
-//         regs.flags(Z, 0, H, C);
-//         return true;
-//     }
+    constexpr bool ADD(const Args::A a, const a_common_r8 auto b)
+    {
+        const std::uint8_t av = read(a);
+        const std::uint8_t bv = read(b);
+        const std::uint8_t v = (av + bv);
+        write(a, v);
+        const bool Z = v == 0;
+        const bool H = half_carry(av, bv);
+        const bool C = carry(av, bv);
+        flags("Z0HC"_sc, Z, H, C);
+        return true;
+    }
 
-//     constexpr bool SUB(const Args::A a, const Args::StdArgImm auto b)
-//     {
-//         const uint8_t av = read(a);
-//         const uint8_t bv = -read(b);
-//         const auto v = av + bv;
-//         write(a, v);
-//         const bool Z = v == 0;
-//         const bool H = half_carry(av, bv);
-//         const bool C = carry(av, bv);
-//         regs.flags(Z, 1, H, C);
-//         return true;
-//     }
+    constexpr bool ADD(const Args::SP a, const Args::S8 b)
+    {
+        const std::uint16_t av = read(a);
+        const std::int8_t bv = read(b);
+        const std::uint16_t v = (av + static_cast<std::uint16_t>(bv));
+        write(a, v);
+        const bool H = half_carry(av, static_cast<uint16_t>(bv));
+        const bool C = carry(av, static_cast<uint16_t>(bv));
+        regs.flags(0, 0, H, C);
+        return true;
+    }
 
-//     constexpr bool SBC(const Args::A a, const Args::StdArgImm auto b)
-//     {
-//         const uint8_t av = read(a);
-//         const uint8_t bv = -(read(b) + regs.test(Registers::Flags::C));
-//         const auto v = av + bv;
-//         write(a, v);
-//         const bool Z = v == 0;
-//         const bool H = half_carry(av, bv);
-//         const bool C = carry(av, bv);
-//         regs.flags(Z, 1, H, C);
-//         return true;
-//     }
+    constexpr bool ADC(const Args::A a, const a_common_arg8 auto b)
+    {
+        const std::uint8_t av = read(a);
+        const std::uint8_t bc = read(b) + read(LR35902::Flags::C{});
+        const std::uint8_t v = av + bc;
+        write(a, v);
+        const bool Z = v == 0;
+        const bool H = half_carry(av, bc);
+        const bool C = carry(av, bc);
+        flags("Z0HC"_sc, Z, H, C);
+        return true;
+    }
 
-//     constexpr bool AND(const Args::A a, const Args::StdArgImm auto b)
-//     {
-//         const uint8_t av = read(a);
-//         const uint8_t bv = read(b);
-//         const auto v = av & bv;
-//         write(a, v);
-//         const bool Z = v == 0;
-//         regs.flags(Z, 0, 1, 0);
-//         return true;
-//     }
+    constexpr bool SUB(const Args::A a, const a_common_arg8 auto b)
+    {
+        const std::uint8_t av = read(a);
+        const std::uint8_t bv = -to_unsigned(read(b));
+        const std::uint8_t v = av + bv;
+        write(a, v);
+        const bool Z = v == 0;
+        const bool H = half_carry(av, bv);
+        const bool C = carry(av, bv);
+        flags("Z1HC"_sc, Z, H, C);
+        return true;
+    }
 
-//     constexpr bool XOR(const Args::A a, const Args::StdArgImm auto b)
-//     {
-//         const uint8_t av = read(a);
-//         const uint8_t bv = read(b);
-//         const auto v = av ^ bv;
-//         write(a, v);
-//         const bool Z = v == 0;
-//         regs.flags(Z, 0, 0, 0);
-//         return true;
-//     }
+    constexpr bool SBC(const Args::A a, const a_common_arg8 auto b)
+    {
+        const std::uint8_t av = read(a);
+        const std::uint8_t bv = -(to_unsigned(read(b)) + to_unsigned(read(LR35902::Flags::C{})));
+        const std::uint8_t v = av + bv;
+        write(a, v);
+        const bool Z = v == 0;
+        const bool H = half_carry(av, bv);
+        const bool C = carry(av, bv);
+        flags("Z1HC"_sc, Z, H, C);
+        return true;
+    }
 
-//     constexpr bool OR(const Args::A a, const Args::StdArgImm auto b)
-//     {
-//         const uint8_t av = read(a);
-//         const uint8_t bv = read(b);
-//         const auto v = av | bv;
-//         write(a, v);
-//         const bool Z = v == 0;
-//         regs.flags(Z, 0, 0, 0);
-//         return true;
-//     }
+    constexpr bool AND(const Args::A a, const a_common_arg8 auto b)
+    {
+        const std::uint8_t av = read(a);
+        const std::uint8_t bv = read(b);
+        const std::uint8_t v = av & bv;
+        write(a, v);
+        const bool Z = v == 0;
+        flags("Z010"_sc, Z);
+        return true;
+    }
 
-//     constexpr bool CP(const Args::A a, const Args::StdArgImm auto b)
-//     {
-//         const uint8_t av = read(a);
-//         const uint8_t bv = -read(b);
-//         const auto v = av + bv;
-//         // Don't write. Only compare
-//         const bool Z = v == 0;
-//         const bool H = half_carry(av, bv);
-//         const bool C = carry(av, bv);
-//         regs.flags(Z, 1, H, C);
-//         return true;
-//     }
+    constexpr bool XOR(const Args::A a, const a_common_arg8 auto b)
+    {
+        const std::uint8_t av = read(a);
+        const std::uint8_t bv = read(b);
+        const std::uint8_t v = av ^ bv;
+        write(a, v);
+        const bool Z = v == 0;
+        flags("Z000"_sc, Z);
+        return true;
+    }
 
-//     constexpr bool PUSH(const Args::Reg16 auto src)
-//     {
-//         push(read(src));
-//         regs.flags('-', '-', '-', '-');
-//         return true;
-//     }
+    constexpr bool OR(const Args::A a, const a_common_arg8 auto b)
+    {
+        const std::uint8_t av = read(a);
+        const std::uint8_t bv = read(b);
+        const std::uint8_t v = av | bv;
+        write(a, v);
+        const bool Z = v == 0;
+        flags("Z000"_sc, Z);
+        return true;
+    }
 
-//     constexpr bool POP(const Args::Reg16 auto dst)
-//     {
-//         write(dst, pop());
-//         regs.flags('-', '-', '-', '-');
-//         return true;
-//     }
+    constexpr bool CP(const Args::A a, const a_common_arg8 auto b)
+    {
+        const std::uint8_t av = read(a);
+        const std::uint8_t bv = -to_unsigned(read(b));
+        const std::uint8_t v = av + bv;
+        write(a, v);
+        const bool Z = v == 0;
+        const bool H = half_carry(av, bv);
+        const bool C = carry(av, bv);
+        flags("Z1HC"_sc, Z, H, C);
+        return true;
+    }
 
-//     constexpr bool RST(const Args::A16 addr)
-//     {
-//         push(read(Args::PC{}));
-//         write(Args::PC{}, read(addr));
-//         return true;
-//     }
+# pragma endregion("MATH")
+# pragma region("CONTROL FLOW")
 
-//     constexpr bool RET(Jump cond)
-//     {
-//         bool success = jump(cond);
-//         if (success) {
-//             write(Args::PC{}, pop());
-//         }
-//         return success;
-//     }
+    template <typename R16>
+    requires a_member_of<R16, Args::BC, Args::DE, Args::HL, Args::AF>
+    constexpr bool PUSH(const R16 src) 
+    {
+        static_assert(sizeof(read(src)) == 2);
+        const std::uint16_t value = read(src);
+        push(value);
+        flags("----"_sc);
+        return true;
+    }
 
-//     constexpr bool CALL(const Args::A16 addr, Jump cond)
-//     {
-//         bool success = jump(cond);
-//         if (success) {
-//             push(read(Args::PC{}));
-//             write(Args::PC{}, read(addr));
-//         }
-//         regs.flags('-', '-', '-', '-');
-//         return success;
-//     }
+    template <typename R16>
+    requires a_member_of<R16, Args::BC, Args::DE, Args::HL, Args::AF>
+    constexpr bool POP(const R16 dst)
+    {
+        static_assert(sizeof(read(dst)) == 2);
+        std::uint16_t value = pop();
+        write(dst, value);
+        flags("----"_sc);
+        return true;
+    }
 
-//     constexpr bool JR(const Args::S8 addr, Jump cond)
-//     {
-//         bool success = jump(cond);
-//         if (success) {
-//             write(Args::PC{}, read(Args::PC{}) + read(addr));
-//         }
-//         regs.flags('-', '-', '-', '-');
-//         return success;
-//     }
+    constexpr bool JP(const Args::A16 addr, const Jump cond = Jump::None)
+    {
+        const bool success = jump(cond);
+        if (success)
+            write(Args::PC{}, read(addr));
+        flags("----");
+        return success;
+    }
 
-//     constexpr bool JP(const Args::A16 addr, Jump cond)
-//     {
-//         bool success = jump(cond);
-//         if (success) {
-//             write(Args::PC{}, read(addr));
-//         }
-//         regs.flags('-', '-', '-', '-');
-//         return success;
-//     }
+    constexpr bool JP(const Args::HL hl)
+    {
+        write(Args::PC{}, read(hl));
+        flags("----");
+        return true;
+    }
 
-//     constexpr bool JP(const Args::HL hl)
-//     {
-//         write(Args::PC{}, read(hl));
-//         regs.flags('-', '-', '-', '-');
-//         return true;
-//     }
+    constexpr bool JR(const Args::S8 offset, const Jump cond = Jump::None)
+    {
+        const bool success = jump(cond);
+        if (success)
+            write(Args::PC{}, read(Args::PC{}) + to_unsigned(read(offset)));
+        flags("----"_sc);
+        return true;
+    }
+
+    constexpr bool CALL(const Args::A16 addr, const Jump cond = Jump::None)
+    {
+        bool success = jump(cond);
+        if (success) {
+            push(read(Args::PC{}));
+            write(Args::PC{}, read(addr));
+        }
+        flags("----"_sc);
+        return success;
+    }
+
+    constexpr bool RST(const Args::A16 addr)
+    {
+        write(Args::SP{}, read(Args::PC{}));
+        write(Args::PC{}, read(addr));
+        flags("----"_sc);
+        return true;
+    }
+
+    constexpr bool RET(Jump cond)
+    {
+        bool success = jump(cond);
+        if (success)
+            write(Args::PC{}, pop());
+        flags("----"_sc);
+        return success;
+    }
+
+    constexpr bool RETI()
+    {
+        IME = true;
+        write(Args::PC{}, pop());
+        flags("----"_sc);
+        return true;
+    }
+
+    constexpr bool EI()
+    {
+        IME = true;
+        flags("----"_sc);
+        return true;
+    }
+
+    constexpr bool DI()
+    {
+        IME = false;
+        flags("----"_sc);
+        return true;
+    }
+
+    constexpr bool DAA()
+    {
+        std::uint8_t f = regs.template read<LR35902::F>();
+        std::uint8_t a = read(Args::A{});
+        const bool n = f & LR35902::Flags::N::reg_mask;
+        const bool c = f & LR35902::Flags::C::reg_mask;
+        const bool h = f & LR35902::Flags::H::reg_mask;
+        if (!n) {
+            if (c || a > 0x99)
+                a += 0x60;
+            if (h || (a & 0x0f) > 0x09)
+                a += 0x06;
+        }
+        else {
+            if (c)
+                a -= 0x60;
+            if (h)
+                a -= 0x06;
+        }
+        bool C = !n && (c || a > 0x99);
+        bool Z = a == 0;
+        flags("Z-0C", Z, C);
+        return true;
+    }
+
+
+
 
 //     constexpr bool STOP()
 //     {
-//         return true;
+//         return true; # TODO
 //     }
 
 //     constexpr bool HALT()
 //     {
-//         return true;
+//         return true; # TODO
 //     }
 
-//     constexpr bool RETI()
-//     {
-//         regs.flags('-', '-', '-', '-');
-//         return true;
-//     }
-
-//     constexpr bool DI()
-//     {
-//         regs.flags('-', '-', '-', '-');
-//         return true;
-//     }
-
-//     constexpr bool EI()
-//     {
-//         regs.flags('-', '-', '-', '-');
-//         return true;
-//     }
-
-//     constexpr bool DAA()
-//     {
-//         return true;
-//     }
+//     
 
 //     constexpr bool RLC(const Args::StdArg auto arg)
 //     {
@@ -584,53 +638,35 @@ public:
 //         return true;
 //     }
 
-// private:
+private:
+    constexpr void push(std::uint16_t value)
+    {
+        std::uint16_t sp = read(Args::SP{});
+        write(Args::rA16{--sp}, (0xFF00 & value) >> 8);
+        write(Args::rA16{--sp}, (0x00FF & value) >> 0);
+        write(Args::SP{}, sp);
+    }
 
-//     constexpr void push(const uint8_t value)
-//     {
-//         const auto spv = read(Args::SP{});
-//         write(Args::SP{}, spv - 1);
-//         write(Args::rSP{}, value);
-//     }
-//     constexpr void push(const uint16_t value /*native endian*/)
-//     {
-//         const uint16_t le_value = to_little_endian(value);
-//         push(static_cast<const uint8_t*>(static_cast<const void *>(&le_value))[1]);
-//         push(static_cast<const uint8_t*>(static_cast<const void *>(&le_value))[0]);
-//     }
+    constexpr std::uint16_t pop()
+    {
+        std::uint16_t sp = read(Args::SP{});
+        const std::uint8_t lsb = read(Args::rA16{sp++});
+        const std::uint8_t msb = read(Args::rA16{sp++});
+        return (static_cast<std::uint16_t>(msb) << 8) | lsb;
+    }
 
-//     constexpr uint8_t pop8()
-//     {
-//         data_t value = read(Args::rSP{});
-//         const auto spv = read(Args::SP{});
-//         write(Args::SP{}, spv+1);
-//         return value;
-//     }
-//     constexpr uint16_t /*native endian*/ pop()
-//     {
-//         uint16_t le_value;
-//         reinterpret_cast<uint8_t*>(le_value)[0] = pop8();
-//         reinterpret_cast<uint8_t*>(le_value)[1] = pop8();
-//         return to_native_endian(le_value);
-//     }
-
-//     constexpr bool jump(Jump cond) const
-//     {
-//         switch( cond ) {
-//             case Jump::Z: return regs.test(Registers::Flags::Z);
-//             case Jump::NZ: return !regs.test(Registers::Flags::Z);
-//             case Jump::C: return regs.test(Registers::Flags::C);
-//             case Jump::NC: return !regs.test(Registers::Flags::C);
-//             case Jump::None: return true;
-//             default: return false;
-//         }
-//         return false;
-//     }
-
-//     constexpr uint8_t bit(int loc, uint8_t value, int end = 0)
-//     {
-//         return ((value & (1 << loc)) >> loc) << end;
-//     }
+    constexpr bool jump(Jump cond) const
+    {
+        switch( cond ) {
+            case Jump::Z: return regs.test(Registers::Flags::Z);
+            case Jump::NZ: return !regs.test(Registers::Flags::Z);
+            case Jump::C: return regs.test(Registers::Flags::C);
+            case Jump::NC: return !regs.test(Registers::Flags::C);
+            case Jump::None: return true;
+            default: return false;
+        }
+        return false;
+    }
 
     // Read from Register Immediately
     template<Type::a_register Type, LR35902::Access::a_immediate Access>
@@ -674,7 +710,8 @@ public:
     }
 
     template<typename const_string>
-    constexpr void flags(const_string str, const bool F1 = false, const bool F2 = false, const bool F3 = false, const bool F4 = false)
+    constexpr 
+    void flags(const_string str, const bool F1 = false, const bool F2 = false, const bool F3 = false, const bool F4 = false)
     {
         static_assert(str.size() == 4, "Flags need 4 values to describe them");
         static_assert(str[0] == '-' || str[0] == '0' || str[0] == '1' || str[0] == 'Z', "Invalid flag value: str[0]");
@@ -683,86 +720,43 @@ public:
         static_assert(str[3] == '-' || str[3] == '0' || str[3] == '1' || str[3] == 'C', "Invalid flag value: str[3]");
 
         // don't touch flags
-        if constexpr (str == "----"_sc)
+        if constexpr (FORCE_READ_WRITE_FLAGS && str == "----"_sc) {
+            // force read & write of flags
+            auto f = regs. template read<LR35902::F>();
+            auto result = LR35902::F{f};
+            regs. template write<LR35902::F>(result);
             return;
+        }
+        else if constexpr (str == "----"_sc) {
+            return;
+        }
 
-        using z_reg_mask_t = decltype(LR35902::Flags::Z::reg_mask);
-        using n_reg_mask_t = decltype(LR35902::Flags::N::reg_mask);
-        using h_reg_mask_t = decltype(LR35902::Flags::H::reg_mask);
-        using c_reg_mask_t = decltype(LR35902::Flags::C::reg_mask);
-
-        // If there's not a '-' then you will be changed and a 0 is set otherwise a 1
-        constexpr bool z_change = str[0] != '-';
-        constexpr bool n_change = str[1] != '-';
-        constexpr bool h_change = str[2] != '-';
-        constexpr bool c_change = str[3] != '-';
-
-        constexpr auto change_mask = [=](){
-            return  (z_change ? z_reg_mask_t{} : LR35902::Flags::Z::reg_mask)
-                |   (n_change ? n_reg_mask_t{} : LR35902::Flags::N::reg_mask)
-                |   (h_change ? h_reg_mask_t{} : LR35902::Flags::H::reg_mask)
-                |   (c_change ? c_reg_mask_t{} : LR35902::Flags::C::reg_mask);
-        }();
-
-        constexpr bool z_set1 = str[0] == '1';
-        constexpr bool n_set1 = str[1] == '1';
-        constexpr bool h_set1 = str[2] == '1';
-        constexpr bool c_set1 = str[3] == '1';
-
-        constexpr auto set1_mask = [=](){
-            return  (z_set1 ? LR35902::Flags::Z::reg_mask : z_reg_mask_t{}) 
-                |   (n_set1 ? LR35902::Flags::N::reg_mask : n_reg_mask_t{}) 
-                |   (h_set1 ? LR35902::Flags::H::reg_mask : h_reg_mask_t{}) 
-                |   (c_set1 ? LR35902::Flags::C::reg_mask : c_reg_mask_t{});
-        }();
-
-        constexpr bool z_eval = str[0] == 'Z';
-        constexpr bool n_eval = str[1] == 'N';
-        constexpr bool h_eval = str[2] == 'H';
-        constexpr bool c_eval = str[3] == 'C';
-
-        constexpr int z_idx = [=](){ return z_eval ? 0 : -1; }();
-        constexpr int n_idx = [=](){ return n_eval ? (z_idx == -1 ? 0 : 1) : -1; }();
-        constexpr int h_idx = [=](){ return h_eval ? (
-            (z_idx == -1 && n_idx == -1) ? 0 :
-            (z_idx == -1 && n_idx ==  0) ? 1 :
-            (z_idx ==  0 && n_idx == -1) ? 1 : 2) : -1; 
-            }();
-        
-        constexpr int c_idx = [=](){ return c_eval ? (
-            (z_idx == -1 && n_idx == -1 && h_idx == -1) ? 0 :
-            (z_idx == -1 && n_idx == -1 && h_idx ==  1) ? 1 :
-            (z_idx == -1 && n_idx ==  1 && h_idx == -1) ? 1 :
-            (z_idx ==  1 && n_idx == -1 && h_idx == -1) ? 1 :
-            (z_idx == -1 && n_idx ==  1 && h_idx ==  1) ? 2 :
-            (z_idx ==  1 && n_idx == -1 && h_idx ==  1) ? 2 :
-            (z_idx ==  1 && n_idx ==  1 && h_idx == -1) ? 2 : 3): -1;
-            }();
-        
-        const auto FN = [=](int idx){
-            switch(idx) {
-                case 1: return F1;
-                case 2: return F2;
-                case 3: return F3;
-                case 4: return F4;
-                default: break;
-            }
-            return false;
+        static constexpr auto mask = [=](const char c) consteval -> std::uint8_t 
+        {
+            std::uint8_t value = 0;
+            for (std::size_t i=0; i<str.size(); ++i)
+                if (str[i] == c)
+                    value |= 1<<i;
+            return value;
         };
 
-        const auto eval_mask = [=](){ return 0
-            |   (z_eval && FN(z_idx) ? LR35902::Flags::Z::reg_mask : z_reg_mask_t{})
-            |   (n_eval && FN(n_idx) ? LR35902::Flags::N::reg_mask : n_reg_mask_t{})
-            |   (h_eval && FN(h_idx) ? LR35902::Flags::H::reg_mask : h_reg_mask_t{})
-            |   (c_eval && FN(c_idx) ? LR35902::Flags::C::reg_mask : c_reg_mask_t{});
-        }();
+        
 
-        auto f = regs. template read<LR35902::F>();
+        std::uint8_t f = regs. template read<LR35902::F>();
         auto result = LR35902::F{f};
-        result.value() &= change_mask;  // remove information off all bits to be changed; implicitly adds all 0 information
-        result.value() |= set1_mask;     // add all ones information; implicitly adds all 0 information
-        result.value() |= eval_mask;    // adds all evaluated information; implicitly adds all evaluated falses
-        regs. template write<LR35902::F>(result);
+
+        static constexpr auto set_mask = mask('1');
+        static constexpr auto change_mask = 0b00001111 & ~mask('-');
+        std::uint8_t eval_mask = 0
+            & (F1 * 0b0000'0001)
+            & (F2 * 0b0000'0010)
+            & (F3 * 0b0000'0100)
+            & (F4 * 0b0000'1000);
+
+        result.value &= change_mask;  // remove info to be overridden
+        result.value |= set_mask;     // add all ones and zeros info
+        result.value |= eval_mask;    // set evaluated info
+        regs.template write<LR35902::F>(result);
     }
 };
 
