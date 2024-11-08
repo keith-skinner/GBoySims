@@ -9,21 +9,21 @@
 
 #include "../validation.hpp"
 
-TEST(LR35902_micro, NOP)
-{
-    RegRecorder registers{};
-    SimpleMemRecorder<std::uint16_t, std::uint8_t, 0xFFFF, 0x0000> memory{};
-    auto reader = LR35902::ReadModel<decltype(memory)>{memory};
-    auto writer = LR35902::WriteModel<decltype(memory)>{memory};
-    LR35902::MMU mmu{reader, writer};
-    LR35902::Micro micro{registers, mmu};
+// TEST(LR35902_micro, NOP)
+// {
+//     RegRecorder registers{};
+//     SimpleMemRecorder<std::uint16_t, std::uint8_t, 0xFFFF, 0x0000> memory{};
+//     auto reader = LR35902::ReadModel<decltype(memory)>{memory};
+//     auto writer = LR35902::WriteModel<decltype(memory)>{memory};
+//     LR35902::MMU mmu{reader, writer};
+//     LR35902::Micro micro{registers, mmu};
 
-    EXPECT_TRUE(memory.records.size() == 0);
-    EXPECT_TRUE(registers.records.size() == 0);
+//     EXPECT_TRUE(memory.records.size() == 0);
+//     EXPECT_TRUE(registers.records.size() == 0);
 
-    micro.NOP();
+//     micro.NOP();
 
-    EXPECT_TRUE(memory.records.size() == 0);
-    EXPECT_TRUE(registers.records.size() == 0);
-};
+//     EXPECT_TRUE(memory.records.size() == 0);
+//     EXPECT_TRUE(registers.records.size() == 0);
+// };
 

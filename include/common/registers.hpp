@@ -1,8 +1,10 @@
 #pragma once
-#include <tuple>
 #include <cstdint>
 #include <type_traits>
 #include <algorithm>
+#include <limits>
+#include <tuple> // needed for std::get to work on indices
+
 #include <cib/tuple.hpp>
 
 #include "utility/meta.hpp"
@@ -10,51 +12,31 @@
 namespace common
 {
 
-// register_file_t is templated with register_def_t's that are templated with regster_t's
+// register_file_t is templated with register_def_t's that are templated with register_t's
 // how to select the correct register_def_t inside a register_file_t after getting passed a register_t
 
 // https://github.com/intel/compile-time-init-build
 
-
-template<typename Register>
-static constexpr std::size_t get_index_helper()
-{
-    return -1;
-}
-
-template<typename Register, typename RegDef, typename ... Rest>
-static constexpr std::size_t get_index_helper()
-{
-    if constexpr (RegDef::template is_valid_register<Register>)
-        return 0;
-    else 
-        return 1 + get_index_helper<Register, Rest...>();
-}
-
-
 template <
     typename NameT,
     typename ReprT,
-    std::size_t MsbV,
-    std::size_t LsbV>
+    std::size_t MsbV, // inclusive
+    std::size_t LsbV> // inclusive
 class register_t
 {
 public:
+    static_assert(LsbV <= MsbV, "Msb must be greater than or equal to Lsb. Msb == Lsb implies 1 bit.");
+
     using Name = NameT;
     using Repr = ReprT;
     static constexpr Name name{};
     static constexpr std::size_t msb = MsbV;
     static constexpr std::size_t lsb = LsbV;
+    // bits [5, 9] means bits 5, 6, 7, 8, 9
+    // bits [5, 5] means bits 5
     static constexpr std::size_t width = msb - lsb + 1;
 
-    static_assert(lsb <= msb, "Msb needs to be lower than or equal to Lsb");
-
-    Repr value{};
-    explicit operator std::uint64_t() const { return value; }
-
-    constexpr register_t() noexcept = default;
-    constexpr register_t(Repr value) noexcept : value{value} {};
-
+    // mask for the value
     static constexpr uint64_t bit_mask = []() consteval -> std::uint64_t {
         if constexpr (width == 64)
             return 0xFFFFFFFFFFFFFFFF;
@@ -64,6 +46,7 @@ public:
             // E.g. Msb=0 & Lsb=0 -> width=1; shift 1 by 1; 0b00010; -1; 0b00001;
             return (static_cast<uint64_t>(1) << static_cast<uint64_t>(width)) - static_cast<uint64_t>(1);
     }();
+    // mask for the larger register representation
     static constexpr uint64_t reg_mask = bit_mask << lsb;
 
     //extract the bits represented by this register from data
@@ -85,66 +68,70 @@ public:
 
 
 /**
- * @brief Register value that describes a Register and its SubRegisters
- * @note  A flag can be described as a subregister with the width of 1 bit
+ * @brief A grouping of registers that logically all write to the same place
  *
- * @tparam Name
- * @tparam Repr What representation a register should be
- * @tparam Width Max number of bits representable in the register
- * @tparam SubRegisters All addressable registers of this register including the name of the register itself
+ * @tparam Name A unique name to distinguish register defs that have the same repr and subregisters
+ * @tparam Repr What memory representation the registerdef should be. Must be able to be indexable by all subregisters
+ * @tparam SubRegisters All addressable registers of this registerdef
  */
 template <
     typename NameT,
-    typename ReprT,
-    std::size_t WidthV,
+    std::integral ReprT,
+    size_t WidthT,
     typename ... SubRegisters>
-
 class registerdef_t
 {
 public:
+    static_assert(WidthT >= std::numeric_limits<ReprT>::digits, "Repr must be at least Width number of bits");
+    static_assert((true && ... && (WidthT > SubRegisters::msb)), "WidthT");
+
     using Name = NameT;
     using Repr = ReprT;
     static constexpr Name name{};
-    static constexpr std::size_t repr_width = (sizeof(Repr) * 8) - 1;
-    static constexpr std::size_t width = WidthV;
-
-    static_assert((width > 0), "Register must have a Width of at least 1");
-    static_assert((width >= repr_width), "Repr must be able to contain width");
-    static_assert((true && ... && (SubRegisters::msb <= width)), "SubRegister must be contained within width");
-    static_assert((true && ... && (SubRegisters::msb <= repr_width)), "SubRegister must be contained within representation");
 
     template<typename ... SubRegisterTypes>
-    constexpr 
-    registerdef_t(SubRegisterTypes... subregisters)
-    : value {}
+    constexpr registerdef_t(SubRegisterTypes&&... subregisters)
+    : m_value {}
     {
         (write(std::forward<SubRegisterTypes>(subregisters)), ...);
     }
+    constexpr registerdef_t(Repr value) : m_value(value) {}
 
     template <typename SubRegister>
-    static constexpr bool is_valid_register = is_member_of_v<std::remove_cvref_t<SubRegister>, SubRegisters...>;
+    static constexpr bool is_registered = is_member_of_v<std::remove_cvref_t<SubRegister>, SubRegisters...>;
 
     template <typename SubRegister>
-    constexpr void write(SubRegister reg)
+    constexpr void write(typename SubRegister::Repr reg)
     {
-        static_assert(is_valid_register<SubRegister>, "Must be writing to a registered subregister.");
-        SubRegister::write(value, reg);
+        static_assert(is_registered<SubRegister>, "Must be writing to a registered subregister.");
+        SubRegister::write(m_value, reg);
     }
 
     template <typename SubRegister>
     constexpr Repr read() const {
-        static_assert(is_valid_register<SubRegister>, "Must be reading from a registered subregister");
-        return SubRegister::read(value);
+        static_assert(is_registered<SubRegister>, "Must be reading from a registered subregister");
+        return SubRegister::read(m_value);
+    }
+
+    constexpr Repr value() const {
+        return m_value;
     }
 
 private:
-    Repr value{};
+    Repr m_value{};
 };
 
-template <typename NameT, typename ... SubRegisters>
-class registerfile_t {
+template <
+    typename NameT, 
+    typename ... RegisterListsT>
+class registerfile_t
+{
+public: //private:
+    template <typename SubRegister>
+    auto& get() { return std::get<index_of<SubRegister>>(registers); }
 public:
     using Name = NameT;
+    using RegisterLists = cib::tuple<RegisterListsT...>;
     static constexpr Name name{};
 
     template<typename ... RegisterList>
@@ -154,47 +141,50 @@ public:
         (set<RegisterList>(regs), ...);
     }
 
+    template<typename Register>
+    static constexpr bool is_registered = (false || ... || RegisterListsT::template is_registered<Register>);
 
-    template <typename SubRegister>
-    constexpr void set(SubRegister reg)
+    template <typename Register>
+    constexpr void set(Register reg)
     {
-        using Register = std::remove_cvref_t<SubRegister>;
-        std::get<Register>(registers) = reg;
-    }
-
-    template <typename SubRegister>
-    static constexpr bool is_valid_register = (false || ... || SubRegisters::template is_valid_register<SubRegister>);
-
-    template<typename SubRegister>
-    constexpr void write(SubRegister reg)
-    {
-        std::get<(get_index<SubRegister>)>(registers).write(reg);
+        registers.template get<Register>() = reg;
     }
 
     template<typename SubRegister>
-    constexpr auto read([[maybe_unused]] SubRegister r = SubRegister{})
+    constexpr void write(typename SubRegister::Repr reg)
     {
-        static_assert(is_valid_register<SubRegister>,
-            "Must be reading from a registered subregister");
-        return std::get<(get_index<SubRegister>)>(registers).template read<SubRegister>();
+        static_assert(index_of<SubRegister> < sizeof...(RegisterListsT), "SubRegister not registered to any register list");
+        get<SubRegister>().template write<SubRegister>(reg);
     }
 
-    template<typename ... FlagRegisters>
-    constexpr void flags(FlagRegisters ... rflags)
+    template<typename SubRegister>
+    constexpr auto read()
     {
-        // do nothing if empty
-        if constexpr (sizeof...(FlagRegisters) == 0)
-            return;
-        static_assert((true && ... && is_valid_register<FlagRegisters>),
-            "FlagRegisters must be registered to this register file");
-        (write(rflags), ...);
+        static_assert(index_of<SubRegister> < sizeof...(RegisterListsT), "SubRegister not registered to any register list");
+        return get<SubRegister>().template read<SubRegister>();
     }
 
+    template<typename Register>
+    static constexpr std::size_t get_index()
+    {
+        return 1;
+    }
+
+    template<typename Register, typename RegDef, typename ... Rest>
+    static constexpr std::size_t get_index()
+    {
+        if constexpr (RegDef::template is_registered<Register>)
+            return 0;
+        else
+            return 1 + get_index<Register, Rest...>();
+    }
+
+    // returns either the index of the 
     template <typename SubRegister>
-    static constexpr std::size_t get_index = get_index_helper<SubRegister, SubRegisters...>();
+    static constexpr std::size_t index_of = get_index<SubRegister, RegisterListsT...>();
 
-private:
-    std::tuple<SubRegisters...> registers;
+private: // private members
+    RegisterLists registers;
 };
 
 

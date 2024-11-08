@@ -4,9 +4,8 @@
 #include <sc/string_constant.hpp>
 #include <names.hpp>
 
-namespace LR35902
+namespace LR35902::Register
 {
-
 template <typename Name, typename Repr, std::size_t Msb, std::size_t Lsb>
 using Register = common::register_t<Name, Repr, Msb, Lsb>; // Range Lsb to Msb is inclusive
 
@@ -36,26 +35,23 @@ using DE = Register<Name::Register::DE, std::uint16_t, 15, 0>;
 using HL = Register<Name::Register::HL, std::uint16_t, 15, 0>;
 using PC = Register<Name::Register::PC, std::uint16_t, 15, 0>;
 using SP = Register<Name::Register::SP, std::uint16_t, 15, 0>;
-
-
 } // namespace LR35902
+
 namespace LR35902::Definitions
 {
-
 template <typename Name, typename Repr, std::size_t Width, typename ... SubRegisters>
 using RegisterDef = common::registerdef_t<Name, Repr, Width, SubRegisters...>;
 
-using AF = RegisterDef<Name::Register::AF, uint16_t, 16, ::LR35902::AF, ::LR35902::A, ::LR35902::F, ::LR35902::Flags::Z, ::LR35902::Flags::N, ::LR35902::Flags::H, ::LR35902::Flags::C>;
-using BC = RegisterDef<Name::Register::BC, uint16_t, 16, ::LR35902::BC, ::LR35902::B, ::LR35902::C>;
-using DE = RegisterDef<Name::Register::DE, uint16_t, 16, ::LR35902::DE, ::LR35902::D, ::LR35902::E>;
-using HL = RegisterDef<Name::Register::HL, uint16_t, 16, ::LR35902::HL, ::LR35902::H, ::LR35902::L>;
-using PC = RegisterDef<Name::Register::PC, uint16_t, 16, ::LR35902::PC>;
-using SP = RegisterDef<Name::Register::SP, uint16_t, 16, ::LR35902::SP>;
-
+using AF = RegisterDef<Name::Register::AF, uint16_t, 16, LR35902::Register::AF, LR35902::Register::A, LR35902::Register::F, LR35902::Register::Flags::Z, LR35902::Register::Flags::N, LR35902::Register::Flags::H, LR35902::Register::Flags::C>;
+using BC = RegisterDef<Name::Register::BC, uint16_t, 16, LR35902::Register::BC, LR35902::Register::B, LR35902::Register::C>;
+using DE = RegisterDef<Name::Register::DE, uint16_t, 16, LR35902::Register::DE, LR35902::Register::D, LR35902::Register::E>;
+using HL = RegisterDef<Name::Register::HL, uint16_t, 16, LR35902::Register::HL, LR35902::Register::H, LR35902::Register::L>;
+using PC = RegisterDef<Name::Register::PC, uint16_t, 16, LR35902::Register::PC>;
+using SP = RegisterDef<Name::Register::SP, uint16_t, 16, LR35902::Register::SP>;
 } // namespace LR35902::Defintions
+
 namespace LR35902
 {
-
 using RegisterFile = common::registerfile_t<
     Name::LR35902,
     Definitions::AF,
@@ -65,6 +61,4 @@ using RegisterFile = common::registerfile_t<
     Definitions::PC,
     Definitions::SP>;
 
-
 } // namespace LR35902
-

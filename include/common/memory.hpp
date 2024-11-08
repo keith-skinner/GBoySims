@@ -196,7 +196,7 @@ struct Memory
 
     template<a_reader R, a_writer W>
     Memory(R r, W w)
-    :   m_reader{std::make_unique<ReadBase<R>>(std::move(r))}
+    :   m_reader{std::make_unique<ReadBase<addr_t, data_t>(std::move(r))}
     ,   m_writer{std::make_unique<WriteBase<W>>(std::move(w))}
     {}
     Memory(const Memory& other)
