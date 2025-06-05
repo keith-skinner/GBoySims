@@ -1,24 +1,30 @@
+cmake_minimum_required(VERSION 3.23.1)
+
 add_library(LR35902 INTERFACE)
+
 target_sources(
     LR35902
     INTERFACE
-    arguments.hpp
-    registers.hpp
-    opcodes.hpp
-    mmu.hpp
+        arguments.hpp
+        registers.hpp
+        opcodes.hpp
+        mmu.hpp
 )
+
 target_link_libraries(
     LR35902
     INTERFACE
-    common
+        common
 )
+
 target_include_directories(
     LR35902
     INTERFACE
-    ${CMAKE_CURRENT_SOURCE_DIR} 
+        ${CMAKE_CURRENT_SOURCE_DIR} 
 )
+
 target_compile_features(
     LR35902
     INTERFACE
-    cxx_std_23
+        cxx_std_23
 )

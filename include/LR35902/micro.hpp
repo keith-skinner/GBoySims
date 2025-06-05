@@ -21,47 +21,6 @@ namespace LR35902
 template<typename T, typename ... Ts>
 concept a_member_of = is_member_of_v<T, Ts...>;
 
-template<typename R8>
-concept a_common_r8 = a_member_of<R8, 
-    Args::A, 
-    Args::B, 
-    Args::C, 
-    Args::D, 
-    Args::E, 
-    Args::H, 
-    Args::L>;
-
-// an extended list of commonly used 8 bit registers that includes the 16 bit reference to rHL
-template<typename R8>
-concept a_common_r8_ext = a_common_r8<R8> || 
-    std::is_same_v<R8, Args::rHL>;
-
-// registers commonly used that are 16 bits
-template<typename R16>
-concept a_common_r16 = a_member_of<R16,
-    Args::BC, 
-    Args::DE,
-    Args::HL, 
-    Args::SP>;
-
-// arguments commonly used that are 8 bits
-template<typename Arg8>
-concept a_common_arg8 = a_common_r8<Arg8> || 
-        a_member_of<Arg8, Args::D8>;
-
-constexpr auto carry = 
-    [](const auto a, const decltype(a) b, const decltype(a) c = 0) -> bool {
-        using I = std::remove_cvref_t<decltype(a)>;
-        return bit_carry<I, std::numeric_limits<I>::digits>(a, b, c);
-    };
-
-constexpr auto half_carry = 
-    [](const std::unsigned_integral auto a, const std::unsigned_integral auto b, const decltype(a) c = 0) -> bool {
-        using I = std::remove_cvref_t<decltype(a)>;
-        return bit_carry<I, std::numeric_limits<I>::digits-4>(a, b, c);
-    };
-
-
 template<typename Memory>
 class Micro
 {
@@ -76,10 +35,22 @@ private:
     bool m_halt_begin = false; // halt begins the instruction after the halt call
     bool m_halt = false; // system clock is stopped; Oscillator and LCD continue to operate
 
+    constexpr auto carry = 
+        [](const auto a, const decltype(a) b, const decltype(a) c = 0) -> bool {
+            using I = std::remove_cvref_t<decltype(a)>;
+            return bit_carry<I, std::numeric_limits<I>::digits>(a, b, c);
+        };
+
+    constexpr auto half_carry = 
+        [](const std::unsigned_integral auto a, const std::unsigned_integral auto b, const decltype(a) c = 0) -> bool {
+            using I = std::remove_cvref_t<decltype(a)>;
+            return bit_carry<I, std::numeric_limits<I>::digits-4>(a, b, c);
+        };
+
 public:
 
     Micro(RegisterFile& regs, Memory& mmu)
-    : regs{regs}, mmu{mmu}
+    : m_regs{regs}, m_mmu{mmu}
     {}
 
     constexpr bool NOP()
@@ -87,6 +58,8 @@ public:
         flags("----"_sc);
         return true;
     }
+
+#pragma region("LD")
 
     template<
         typename DstType, typename DstAccess,
@@ -659,9 +632,9 @@ private:
         using namespace LR35902;
         switch( cond ) {
             case Jump::Z:  return  m_regs.read<Register::Flags::Z>();
-            // case Jump::NZ: return !m_regs.read<Register::Flags::Z>();
-            // case Jump::C:  return  m_regs.read<Register::Flags::C>();
-            // case Jump::NC: return !m_regs.read<Register::Flags::C>();
+            case Jump::NZ: return !m_regs.read<Register::Flags::Z>();
+            case Jump::C:  return  m_regs.read<Register::Flags::C>();
+            case Jump::NC: return !m_regs.read<Register::Flags::C>();
             case Jump::None: return true;
             default: return false; // Should not happen
         }
@@ -710,7 +683,6 @@ private:
     }
 
     template <typename FlagStr, typename ... FlagsT>
-    requires (true && ... && std::same_as<FlagsT, bool>)
     void flags(FlagStr flagStr, FlagsT ... flagsVal)
     {
         // Validate FlagStr
@@ -735,23 +707,18 @@ private:
         static constexpr int hIdx = nIdx + 1 * (flagStr[2] == 'H');
         static constexpr int cIdx = hIdx + 1 * (flagStr[3] == 'C');
 
-        // TODO make a read mask based on if flagStr[n] == '-'
-        // then make a write mask that has a 1 for 0/1/ZNHC
-        // Then its read f ; clear non-read mask bits ; set bits that would be set by 1 / ZNHC
-        // Instead of doing this individually for every bit below.
-
-
-        auto f = m_regs.read<Register::F>();
+        
         if constexpr (flagStr != "----"_sc)
         {
-            
-            
+            auto f = m_regs.read<Register::F>();
+
             Register::Flags::Z::write(f, false || (flagStr[0] == '1') || (flagStr[0] == '-' && Register::Flags::Z::read(f)) || (flagStr[0] == 'Z' && std::get<zIdx>(flagVals)));
             Register::Flags::N::write(f, false || (flagStr[1] == '1') || (flagStr[1] == '-' && Register::Flags::N::read(f)) || (flagStr[1] == 'N' && std::get<nIdx>(flagVals)));
             Register::Flags::H::write(f, false || (flagStr[2] == '1') || (flagStr[2] == '-' && Register::Flags::H::read(f)) || (flagStr[2] == 'H' && std::get<hIdx>(flagVals)));
             Register::Flags::C::write(f, false || (flagStr[3] == '1') || (flagStr[3] == '-' && Register::Flags::C::read(f)) || (flagStr[3] == 'C' && std::get<cIdx>(flagVals)));
+            
+            m_regs.write<Register::F>(f);
         }
-        m_regs.write<Register::F>(f);
     }
 };
 

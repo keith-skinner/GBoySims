@@ -24,6 +24,7 @@ using D = decltype("D"_sc);
 using E = decltype("E"_sc);
 using H = decltype("H"_sc);
 using L = decltype("L"_sc);
+
 using AF = decltype("AF"_sc);
 using BC = decltype("BC"_sc);
 using DE = decltype("DE"_sc);
@@ -39,6 +40,6 @@ using D8  = decltype("D8"_sc);
 using A8  = decltype("A8"_sc);
 using A16 = decltype("A16"_sc);
 using D16 = decltype("D16"_sc);
-}
+} // namespace Literal
 
-}
+} // namespace Register
