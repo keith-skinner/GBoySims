@@ -4,6 +4,8 @@
 #include <array>
 
 #include <utility/interval.hpp>
+
+#include "SystemTypes.hpp"
 #include "state.hpp"
 
 namespace LR35902
@@ -11,8 +13,6 @@ namespace LR35902
 
 namespace MMU
 {
-using Addr = std::uint16_t;
-using Data = std::uint8_t;
 
 namespace MemoryRegions
 {
@@ -163,80 +163,15 @@ struct LCDC
     LR35902::SystemState& systemState;
 };
 
-template<typename RegionT>
-class RAM
-{
-public:
-    using Region = RegionT;
 
-    [[nodiscard]] inline constexpr static bool for_me(const Addr addr) { return Region::contains(addr); }
-
-    inline constexpr void write(const Addr addr, const Data data) noexcept {
-        m_data[addr-Region::min()] = data;
-    }
-
-    [[nodiscard]] inline constexpr Data read(const Addr addr) noexcept {
-        return m_data[addr-Region::min()];
-    }
-
-private:
-    std::array<Data, Region::DISTANCE> m_data;
-};
-
-template<typename RegionT, typename ShadowedT, Data OffsetV = Data{0}>
-class ShadowedRAM
-{
-public:
-    using Region = RegionT;
-    using Shadowed = ShadowedT;
-    using ShadowedRegion = Shadowed::typename Region;
-    static constexpr Data OFFSET = OffsetV;
-
-    static_assert(
-        Shadowed::for_me(OFFSET),
-        "Offset must be a value inside the shadowed region.");
-
-    static_assert(
-        Shadowed::for_me(toShadowedAddr(Region::min()))
-    &&  Shadowed::for_me(toShadowedAddr(Region::max())),
-        "All values of Region must map to Shadowed::Region.");
-
-    
-    [[nodiscard]] inline static constexpr
-    Addr toShadowedAddr(const Addr addr) noexcept
-    {
-        return addr - Region::min() + OFFSET;
-    }
-    
-    [[nodiscard]] inline static constexpr
-    bool for_me(const Addr addr) noexcept
-    {
-        return Region::contains(addr);
-    }
-    
-    inline constexpr 
-    void write(const Addr addr, const Data data) noexcept
-    {
-        m_shadowed.write(toShadowedAddr(addr), data);
-    }
-    
-    [[nodiscard]] inline constexpr 
-    Data read(const Addr addr) noexcept
-    {
-        return m_shadowed.read(toShadowedAddr(addr));
-    }
-
-private:
-    Shadowed m_shadowed;
-};
 
 template<typename RegionT, std::size_t CountV>
 class SwitchedRAM
 {
-    using Region = RegionT;h 
+    using Region = RegionT;
     static constexpr std::size_t COUNT = CountV;
 
-    void switch(const std::size_t index)
+    void setSwitchIdx(const std::size_t index)
     {
         if (index < COUNT)
             m_index = index;
@@ -245,14 +180,14 @@ class SwitchedRAM
     std::uint8_t& at(const std::size_t pos)
     {
         if (pos < Region::DISTANCE)
-            return m_data[pos];
+            return m_data[m_index][pos];
         else throw std::out_of_range();
     }
 
     std::uint8_t& at(const std::size_t pos) const
     {
         if (pos < Region::DISTANCE)
-            return m_data[pos];
+            return m_data[m_index][pos];
         else throw std::out_of_range();
     }
 
@@ -269,12 +204,12 @@ struct MMU
 {
     [[nodiscard]] inline constexpr bool for_me(const Addr addr) noexcept
     {
-        return true;
+        return false;
     }
 
     inline constexpr void write(const Addr addr, const Data data) noexcept
     {
-        
+        return ;
     }
     
     inline constexpr Data read(const Addr addr) noexcept

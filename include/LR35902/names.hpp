@@ -36,6 +36,7 @@ using SP = decltype("SP"_sc);
 namespace Literal
 {
 using S8  = decltype("S8"_sc);
+using A8  = decltype("A8"_sc);
 using D8  = decltype("D8"_sc);
 using A8  = decltype("A8"_sc);
 using A16 = decltype("A16"_sc);

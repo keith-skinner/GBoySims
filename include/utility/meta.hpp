@@ -29,14 +29,28 @@ struct Find
 {
     // bind T to is_same
     template<typename Candidate>
-    struct is_same : std::is_same<Target, Candidate> {};
+    struct is_same : std::bool_constant<std::is_same_v<std::remove_cvref_t<Target>, std::remove_cvref_t<Candidate>>> {};
+
+    template<typename Candidate>
+    struct is_different : std::bool_constant<!std::is_same_v<std::remove_cvref_t<Target>, Candidate>> {};
     
     template<typename... Candidates>
     static constexpr std::size_t index = find_if<is_same, Candidates...>::value;
     
     
     template<typename... Candidates>
-    static constexpr bool member = index<Candidates...> < sizeof...(Candidates);
+    static constexpr bool any_of = (is_same<Candidates>::value || ...);
+
+    template<typename... Candidates>
+    static constexpr bool none_of = (!is_same<Candidates>::value && ...);
+
+    template<typename... Candidates>
+    static constexpr bool all_of = (is_same<Candidates>::value && ...);
+
+    template<typename... Candidate>
+    static constexpr size_t count = (is_same<Candidates>::value + ...);
+
+
 };
 
 template<typename T, typename... Ts>

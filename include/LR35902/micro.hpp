@@ -13,147 +13,139 @@
 #include "arguments.hpp"
 #include "registers.hpp"
 #include "mmu.hpp"
+#include "options.hpp"
 
 constexpr auto FORCE_READ_WRITE_FLAGS = false;
 
+template<std::integeral I>
+constexpr std::make_unsigned_t<I> as_unsigned (const I i) { return static_cast<make_unsigned_t<I>>(i); }
+
+
 namespace LR35902
 {
-template<typename T, typename ... Ts>
-concept a_member_of = is_member_of_v<T, Ts...>;
 
 template<typename Memory>
 class Micro
 {
 public:
+
     enum class Jump { Z, NZ, C, NC, None };
+
 private:
-    RegisterFile& m_regs;
-    Memory& m_mmu;
-    bool m_IME = false; // interrupt master enable
-    bool m_stop = false; // can only be cancelled by a reset signal
-    
-    bool m_halt_begin = false; // halt begins the instruction after the halt call
-    bool m_halt = false; // system clock is stopped; Oscillator and LCD continue to operate
-
-    constexpr auto carry = 
-        [](const auto a, const decltype(a) b, const decltype(a) c = 0) -> bool {
-            using I = std::remove_cvref_t<decltype(a)>;
-            return bit_carry<I, std::numeric_limits<I>::digits>(a, b, c);
-        };
-
-    constexpr auto half_carry = 
-        [](const std::unsigned_integral auto a, const std::unsigned_integral auto b, const decltype(a) c = 0) -> bool {
-            using I = std::remove_cvref_t<decltype(a)>;
-            return bit_carry<I, std::numeric_limits<I>::digits-4>(a, b, c);
-        };
+    RegisterFile m_regs;
+    Memory m_mmu;
 
 public:
-
-    Micro(RegisterFile& regs, Memory& mmu)
+    Micro(RegisterFile&& regs, Memory&& mmu)
     : m_regs{regs}, m_mmu{mmu}
     {}
 
     constexpr bool NOP()
     {
-        flags("----"_sc);
+        Flags<"----"_sc>();
         return true;
     }
 
 #pragma region("LD")
 
-    template<
-        typename DstType, typename DstAccess,
-        typename SrcType, typename SrcAccess>
-    constexpr bool LD(
-        const Args::Argument<DstType, DstAccess> dst,
-        const Args::Argument<SrcType, SrcAccess> src)
+    template<a_destination Destination, a_argument Source>
+    requires !(a_reference<Destination> && a_reference<Source>)
+    constexpr bool LD(Destination DEST, Source SRC)
     {
-        const auto value = read(src);
-        write(dst, value);
-        flags("----"_sc);
+        write(DEST, read(SRC));
+        Flags<"----"_sc>();
         return true;
     }
 
-    constexpr bool LD(const Args::A, const Args::rHL, const std::uint16_t adj)
+    constexpr bool LD(const Args::A A, const Args::rHL rHL, Args::HL::Data vADJ)
     {
-        const auto hl = read(Args::HL{});
-        const auto rhl = read(Args::rA16{hl});
-        write(Args::A{}, rhl);
-        write(Args::HL{}, hl + adj);
-        flags("----"_sc);
+        const auto vHL = read(Args::HL{});
+        write(A, rHL);
+        write(Args::HL{}, vHL + vADJ);
+
+        Flags<"----"_sc>();
         return true;
     }
 
-    constexpr bool LD(const Args::rHL, const Args::A, const std::uint16_t adj)
+    constexpr bool LD(const Args::rHL rHL, const Args::A A, Args::HL::Data vADJ)
     {
-        const auto a = read(Args::A{});
-        const auto hl = read(Args::HL{});
-        write(Args::rA16{hl}, a);
-        write(Args::HL{}, hl + adj);
-        flags("----"_sc);
+        const Args::HL::Data vHL = read(Args::HL{});
+        write(rHL, A);
+        write(Args::HL{}, vHL + vADJ);
+
+        Flags<"----"_sc>();
         return true;
     }
 
-    constexpr bool LD(const Args::HL, const Args::SP, const Args::S8 off)
+    constexpr bool LD(const Args::HL HL, const Args::SP SP, const Args::S8 OFF)
     {
-        const auto sp = read(Args::SP{});
-        const auto voff = static_cast<decltype(sp)>(read(off)); // convert to unsigned
-        write(Args::HL{}, sp + voff);
-        const Register::Flags::H H = half_carry(sp, voff);
-        const Register::Flags::C C = carry(sp, voff);
-        flags("00HC"_sc, H, C);
+        const auto vSP = read(SP);
+        const auto vOFF = static_cast<Args::D8::Data>(read(OFF));
+        write(Args::HL{}, Args::HL::Data{vSP + vOFF});
+        
+        const auto vP = static_cast<Args::D8::Data>(vSP);
+        const bool H = half_carry(vP, vOFF);
+        const bool C = carry(vP, vOFF);
+        Flags<"00HC"_sc>({.H=H, .C=C});
         return true;
     }
 
 #pragma endregion("LD")
 
 #pragma region('MATH')
+    template<a_r16 Destination>
+    constexpr bool INC(const Destination DEST)
+    {
+        using Data = typename Destination::Data;
+        static constexpr Data vINC = 1;
 
-    constexpr bool INC(const a_common_r16 auto r)
-    {
-        write(r, read(r) + 1);
-        flags("----"_sc);
-        return true;
-    }
-    
-    constexpr bool INC(const a_common_r8 auto r)
-    {
-        using value_t = typename decltype(r)::Type::Type;
-        const value_t value = read(r);
-        write(r, value + 1);
-        const Register::Flags::Z Z = (value + 1) == 0;
-        const Register::Flags::H H = half_carry(value, 1);
-        flags("Z0H-"_sc, Z, H);
+        write(DEST, read(DEST) + vINC);
+
+        Flags<"----"_sc>();
         return true;
     }
 
-    constexpr bool DEC(const a_common_r16 auto r)
+    template<a_r8_or_rHL Destination>
+    constexpr bool INC(const Destination DEST)
     {
-        write(r, read(r) - 1);
-        flags("----"_sc);
+        using Data = typename Destination::Data;
+        static constexpr Data vINC = 1;
+
+        const Data vDEST = read(DEST);
+        const Data result =  + vINC;
+        write(dest, result);
+        
+        const bool Z = result == 0;
+        const bool H = half_carry(vDEST, vINC);
+        Flags<"Z0H-"_sc>({.Z=Z, .H=H});
         return true;
     }
 
-    constexpr bool DEC(const a_common_arg8 auto r)
+    template<a_r8_or_rHL Destination>
+    constexpr bool DEC(const Destination DEST)
     {
-        using value_t = typename decltype(r)::Type::Type;
-        const value_t value = read(r);
-        write(r, value - 1);
-        const Register::Flags::Z Z = value - 1 == 0;
-        const Register::Flags::H H = half_carry(value, -1);
-        flags("Z1H-"_sc, Z, H);
+        using Data = typename Destination::Data;
+        static constexpr Data vINC = static_cast<Data>(-1);
+
+        const Data vDEST = read(DEST);
+        const Data result =  + vINC;
+        write(dest, result);
+
+        const bool Z = result == 0;
+        const bool H = half_carry(vDEST, vINC);
+        Flags<"Z1H-"_sc>{.Z=Z, .H=H}();
         return true;
     }
 
     constexpr bool ADD(const Args::HL a, const a_common_r16 auto b)
     {
-        const std::uint16_t av = read(a);
-        const std::uint16_t bv = read(b);
-        const std::uint16_t v = (av + bv);
+        const auto av = read(a);
+        const auto bv = read(b);
+        const auto v = (av + bv);
         write(a, v);
         const Register::Flags::H::Repr H = half_carry(av, bv);
         const Register::Flags::C::Repr C = carry(av, bv);
-        flags("-0HC"_sc, H, C);
+        Flags<"-0HC"_sc>{.H=H, .C=C}();
         return true;
     }
 
@@ -166,7 +158,7 @@ public:
         const Register::Flags::Z::Repr Z = v == 0;
         const Register::Flags::H::Repr H = half_carry(av, bv);
         const Register::Flags::C::Repr C = carry(av, bv);
-        flags("Z0HC"_sc, Z, H, C);
+        Flags<"Z0HC"_sc>{.Z=Z, .H=H, .C=C}();
         return true;
     }
 
@@ -178,7 +170,7 @@ public:
         write(a, v);
         const Register::Flags::H::Repr H = half_carry(av, static_cast<uint16_t>(bv));
         const Register::Flags::C::Repr C = carry(av, static_cast<uint16_t>(bv));
-        flags("00HC"_sc, H, C);
+        Flags<"00HC"_sc>{.H=H, .C=C}();
         return true;
     }
 
@@ -191,7 +183,7 @@ public:
         const Register::Flags::Z::Repr Z = v == 0;
         const Register::Flags::H::Repr H = half_carry(av, bc);
         const Register::Flags::C::Repr C = carry(av, bc);
-        flags("Z0HC"_sc, Z, H, C);
+        flags("Z0HC"_sc, FlagArgs{.Z=Z, .H=H, .C=C});
         return true;
     }
 
@@ -201,10 +193,15 @@ public:
         const std::uint8_t bv = -to_unsigned(read(b));
         const std::uint8_t v = av + bv;
         write(a, v);
-        const Register::Flags::Z::Repr Z = v == 0;
-        const Register::Flags::H::Repr H = half_carry(av, bv);
-        const Register::Flags::C::Repr C = carry(av, bv);
-        flags("Z1HC"_sc, Z, H, C);
+
+        FlagArgs flags {
+            .Z = v == 0;
+            .N = 0;
+            .H = half_carry(av, bv);
+            .C = carry(av, bv);
+        };
+        flags("Z1HC"_sc, flags);
+
         return true;
     }
 
@@ -269,7 +266,7 @@ public:
 
     template <typename R16>
     requires a_member_of<R16, Args::BC, Args::DE, Args::HL, Args::AF>
-    constexpr bool PUSH(const R16 src) 
+    constexpr bool PUSH(const R16 src)
     {
         static_assert(sizeof(read(src)) == 2);
         const std::uint16_t value = read(src);
@@ -406,7 +403,7 @@ public:
         return true;
     }
 
-//     
+//
 
 //     constexpr bool RLC(const Args::StdArg auto arg)
 //     {
@@ -682,44 +679,84 @@ private:
         m_mmu.write(addr, value);
     }
 
-    template <typename FlagStr, typename ... FlagsT>
-    void flags(FlagStr flagStr, FlagsT ... flagsVal)
+    struct FlagsVal
     {
-        // Validate FlagStr
-        static_assert(flagStr.size() == 4);
-        static_assert(flagStr[0] == 'Z' || flagStr[0] == '-' || flagStr[0] == '0' || flagStr[0] == '1');
-        static_assert(flagStr[1] == 'N' || flagStr[0] == '-' || flagStr[0] == '0' || flagStr[0] == '1');
-        static_assert(flagStr[2] == 'H' || flagStr[0] == '-' || flagStr[0] == '0' || flagStr[0] == '1');
-        static_assert(flagStr[3] == 'C' || flagStr[0] == '-' || flagStr[0] == '0' || flagStr[0] == '1');
+        const bool Z;
+        const bool N;
+        const bool H;
+        const bool C;
+    };
 
-        // Validate FlagStr
-        static constexpr int evalFlagsCount = 
-            (flagStr[0] == 'Z') + 
-            (flagStr[1] == 'N') + 
-            (flagStr[2] == 'H') + 
-            (flagStr[3] == 'C');
-        static_assert(sizeof...(FlagsT) == evalFlagsCount);
+    template<typename FlagStr>
+    constexpr void Flags(FlagsVal flags) {
+        static constexpr FlagStr flagStr = FlagStr{};
 
-        const auto flagVals = std::make_tuple(flagsVal...);
-        static constexpr int INVALID = -1;
-        static constexpr int zIdx = INVALID + 1 * (flagStr[0] == 'Z');
-        static constexpr int nIdx = zIdx + 1 * (flagStr[1] == 'N');
-        static constexpr int hIdx = nIdx + 1 * (flagStr[2] == 'H');
-        static constexpr int cIdx = hIdx + 1 * (flagStr[3] == 'C');
+        static_assert(flagStr.size() != 4, "Incorrect number of characters in flagStr");
+        static_assert(flagStr[0] == 'Z' || flagStr[0] == '-' || flagStr[0] == '0' || flagStr[0] == '1', "Invalid flagStr[0]");
+        static_assert(flagStr[1] == 'N' || flagStr[1] == '-' || flagStr[1] == '0' || flagStr[1] == '1', "Invalid flagStr[1]");
+        static_assert(flagStr[2] == 'H' || flagStr[2] == '-' || flagStr[2] == '0' || flagStr[2] == '1', "Invalid flagStr[2]");
+        static_assert(flagStr[3] == 'C' || flagStr[3] == '-' || flagStr[3] == '0' || flagStr[3] == '1', "Invalid flagStr[3]");
 
+        static constexpr Data KEEP_MASK = // KEEP_MASK also sets zero mask
+                flagStr[0] == '-' * Register::Flags::Z::reg_mask
+            |   flagStr[1] == '-' * Register::Flags::N::reg_mask
+            |   flagStr[2] == '-' * Register::Flags::H::reg_mask
+            |   flagStr[3] == '-' * Register::Flags::C::reg_mask;
+
+        static constexpr Data SET_1_MASK =
+                flagStr[0] == '1' * Register::Flags::Z::reg_mask
+            |   flagStr[1] == '1' * Register::Flags::N::reg_mask
+            |   flagStr[2] == '1' * Register::Flags::H::reg_mask
+            |   flagStr[3] == '1' * Register::Flags::C::reg_mask;
+
+        if constexpr (flagStr == "----"_sc && !ForceFlagsRegRead)
+            return;
         
-        if constexpr (flagStr != "----"_sc)
-        {
-            auto f = m_regs.read<Register::F>();
-
-            Register::Flags::Z::write(f, false || (flagStr[0] == '1') || (flagStr[0] == '-' && Register::Flags::Z::read(f)) || (flagStr[0] == 'Z' && std::get<zIdx>(flagVals)));
-            Register::Flags::N::write(f, false || (flagStr[1] == '1') || (flagStr[1] == '-' && Register::Flags::N::read(f)) || (flagStr[1] == 'N' && std::get<nIdx>(flagVals)));
-            Register::Flags::H::write(f, false || (flagStr[2] == '1') || (flagStr[2] == '-' && Register::Flags::H::read(f)) || (flagStr[2] == 'H' && std::get<hIdx>(flagVals)));
-            Register::Flags::C::write(f, false || (flagStr[3] == '1') || (flagStr[3] == '-' && Register::Flags::C::read(f)) || (flagStr[3] == 'C' && std::get<cIdx>(flagVals)));
-            
-            m_regs.write<Register::F>(f);
-        }
+        Data setMask = SET_1_MASK;
+        if constexpr (flagStr[0] == 'Z')
+            setMask |= flags.Z * Register::Flags::Z::reg_mask;
+        if constexpr (flagStr[1] == 'N')
+            setMask |= flags.N * Register::Flags::N::reg_mask;
+        if constexpr (flagStr[2] == 'H')
+            setMask |= flags.H * Register::Flags::H::reg_mask;
+        if constexpr (flagStr[3] == 'C')
+            setMask |= flags.C * Register::Flags::C::reg_mask;
+        
+        constexpr Data FLAGS_OLD = read(Args::F{});
+        constexpr Data FLAGS_NEW = (FLAGS_OLD & KEEP_MASK) | setMask;
+        write(Args::F{}, FLAGS_NEW);
     }
+
+    template<typename FlagStr>
+    constexpr void Flags() {
+        static constexpr FlagStr flagStr = FlagStr{};
+
+        static_assert(flagStr.size() != 4, "Incorrect number of characters in flagStr");
+        static_assert(flagStr[0] == '-' || flagStr[0] == '0' || flagStr[0] == '1', "Invalid flagStr[0]");
+        static_assert(flagStr[1] == '-' || flagStr[1] == '0' || flagStr[1] == '1', "Invalid flagStr[1]");
+        static_assert(flagStr[2] == '-' || flagStr[2] == '0' || flagStr[2] == '1', "Invalid flagStr[2]");
+        static_assert(flagStr[3] == '-' || flagStr[3] == '0' || flagStr[3] == '1', "Invalid flagStr[3]");
+
+        static constexpr Data KEEP_MASK = // KEEP_MASK also sets zero mask
+                flagStr[0] == '-' * Register::Flags::Z::reg_mask
+            |   flagStr[1] == '-' * Register::Flags::N::reg_mask
+            |   flagStr[2] == '-' * Register::Flags::H::reg_mask
+            |   flagStr[3] == '-' * Register::Flags::C::reg_mask;
+        
+        static constexpr Data SET_1_MASK =
+                flagStr[0] == '1' * Register::Flags::Z::reg_mask
+            |   flagStr[1] == '1' * Register::Flags::N::reg_mask
+            |   flagStr[2] == '1' * Register::Flags::H::reg_mask
+            |   flagStr[3] == '1' * Register::Flags::C::reg_mask;
+        
+        if constexpr (flagStr == "----"_sc && !ForceFlagsRegRead)
+            return;
+        
+        constexpr Data FLAGS_OLD = read(Args::F{});
+        constexpr Data FLAGS_NEW = (FLAGS_OLD & KEEP_MASK) | SET_1_MASK;
+        write(Args::F{}, FLAGS_NEW);
+    }
+
 };
 
-}
+} // namespace LR35902

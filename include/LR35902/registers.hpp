@@ -23,13 +23,13 @@ using C = Register<Name::Flag::C, 4, 4>;
 
 // 8 Bit Registers
 using A = Register<Name::Register::A, 15, 8>;
-using F = Register<Name::Register::F, 7,  0>;
+using F = Register<Name::Register::F,  7, 0>;
 using B = Register<Name::Register::B, 15, 8>;
-using C = Register<Name::Register::C, 7,  0>;
+using C = Register<Name::Register::C,  7, 0>;
 using D = Register<Name::Register::D, 15, 8>;
-using E = Register<Name::Register::E, 7,  0>;
+using E = Register<Name::Register::E,  7, 0>;
 using H = Register<Name::Register::H, 15, 8>;
-using L = Register<Name::Register::L, 7,  0>;
+using L = Register<Name::Register::L,  7, 0>;
 
 
 // 16 bit Registers

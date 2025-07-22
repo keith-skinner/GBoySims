@@ -1,4 +1,5 @@
-#pragma once
+#ifndef UTILITY_INTERVAL_HPP
+#define UTILITY_INTERVAL_HPP
 
 #include <iterator>
 #include <numeric>
@@ -19,8 +20,7 @@ template<
     T BeginV,
     T EndV,
     Boundary LeftV,
-    Boundary RightV
->
+    Boundary RightV>
 struct Interval
 {
     static constexpr T BEGIN = BeginV;
@@ -83,7 +83,6 @@ struct Interval
 };
 
 
-
 namespace impl {
 template<typename U>
 inline constexpr U accumulate(std::initializer_list<U> ilist)
@@ -92,14 +91,19 @@ inline constexpr U accumulate(std::initializer_list<U> ilist)
 }
 } // namespace impl
 
+
 template<typename ... Intervals>
 struct MultiInterval
 {
-    static constexpr std::size_t DISTANCE = impl::accumulate({Intervals::DISTANCE, ...});
+private:
+    
+public:
+    static constexpr std::size_t DISTANCE = impl::accumulate({Intervals::DISTANCE, ...}); // TODO: is going to be wrong for overlapping intervals
     [[nodiscard]] inline static constexpr bool isMember(const T value) { return (Intervals::isMember(value) || ...); }
     [[nodiscard]] inline static constexpr T min() const { return std::min({Intervals::min(), ...}); }
     [[nodiscard]] inline static constexpr T max() const { return std::max({Intervals::max(), ...}); }
 };
+
 
 namespace interval
 {
@@ -108,7 +112,7 @@ template<typename T, T BEGIN, T END>
 using Open = Interval<T, BEGIN, END, Boundary::Exclusive, Boundary::Exclusive>;
 
 template<typename T, T BEGIN, T END>
-using Closed= Interval<T, BEGIN, END, Boundary::Inclusive, Boundary::Inclusive>;
+using Closed = Interval<T, BEGIN, END, Boundary::Inclusive, Boundary::Inclusive>;
 
 template<typename T, T VALUE>
 using Singular = Closed<T, VALUE, VALUE>;
@@ -119,3 +123,5 @@ using Span = Interval<T, BEGIN, END, Boundary::Inclusive, Boundary::Exclusive>;
 } // namespace iterval
 
 } // namespace utility
+
+#endif // UTILITY_INTERVAL_HPP
